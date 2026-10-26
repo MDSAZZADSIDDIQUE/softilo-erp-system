@@ -1,0 +1,20 @@
+{
+  "name": "softilo-erp",
+  "private": true,
+  "packageManager": "pnpm@10.27.0",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "build": "turbo run build",
+    "dev": "turbo run build --filter=./packages/* && turbo run dev --parallel --filter=./apps/*",
+    "test": "turbo run test",
+    "typecheck": "turbo run typecheck",
+    "seed": "turbo run build --filter=./packages/* && pnpm --filter @softilo/api seed",
+    "migrate": "turbo run build --filter=@softilo/db && pnpm --filter @softilo/db migrate"
+  },
+  "devDependencies": {
+    "turbo": "^2.11.10",
+    "typescript": "~5.9.0"
+  }
+}
