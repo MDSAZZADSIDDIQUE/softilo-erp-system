@@ -1,0 +1,15 @@
+/* Manufacturing additions, built only from the core tokens (Ink, Paper, Signal orange, greys). */
+.shopfloor { display: grid; gap: 20px; grid-template-columns: repeat(3, minmax(0, 1fr)); }
+@media (max-width: 1100px) { .shopfloor { grid-template-columns: minmax(0, 1fr); } }
+/* Large tap targets for the shop floor, usable with gloves on a tablet. */
+.shopfloor .btn { min-height: 48px; font-size: 15px; width: 100%; }
+.shopfloor input, .shopfloor select { min-height: 44px; font-size: 15px; }
+.cost-bar { display: flex; height: 10px; border-radius: 999px; overflow: hidden; background: var(--surface-sunken); margin-top: 10px; }
+.cost-bar span { display: block; height: 100%; }
+.cost-bar .material { background: var(--text); }
+.cost-bar .labour { background: var(--grey-700); }
+.cost-bar .overhead { background: var(--grey-300); }
+.legend i.material { background: var(--text); }
+.legend i.labour { background: var(--grey-700); }
+.legend i.overhead { background: var(--grey-300); }
+.level { display: inline-block; min-width: 22px; text-align: center; font-size: 12px; color: var(--text-muted); border: 1px solid var(--border-strong); border-radius: 4px; padding: 0 4px; }

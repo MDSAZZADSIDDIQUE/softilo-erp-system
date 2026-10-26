@@ -12,6 +12,18 @@
       "runtimeExecutable": "pnpm",
       "runtimeArgs": ["--filter", "@softilo/web", "dev"],
       "port": 3000
+    },
+    {
+      "name": "mfg-api",
+      "runtimeExecutable": "pnpm",
+      "runtimeArgs": ["--filter", "@softilo/mfg-api", "dev"],
+      "port": 4030
+    },
+    {
+      "name": "mfg-web",
+      "runtimeExecutable": "pnpm",
+      "runtimeArgs": ["--filter", "@softilo/mfg-web", "dev"],
+      "port": 3030
     }
   ]
 }
