@@ -1,0 +1,20 @@
+/* Recruitment edition additions; every colour comes from the core tokens. */
+.sidebar .brand .edition {
+  display: block; margin-top: 6px; font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--accent);
+}
+.awr-weeks { display: flex; flex-wrap: wrap; gap: 4px; }
+.awr-weeks span {
+  width: 22px; height: 22px; border-radius: 4px; border: 1px solid var(--border-strong);
+  font-size: 10px; display: inline-flex; align-items: center; justify-content: center; color: var(--text-muted);
+}
+.awr-weeks .worked, .awr-weeks .counted_absence { background: var(--text); border-color: var(--text); color: var(--bg); }
+.awr-weeks .paused { background: var(--surface-sunken); }
+.awr-weeks .break { border-style: dashed; }
+.awr-weeks .reset { background: var(--accent); border-color: var(--accent); color: #fff; }
+.progress { height: 6px; border-radius: 3px; background: var(--surface-sunken); overflow: hidden; min-width: 80px; }
+.progress > i { display: block; height: 100%; background: var(--text); }
+.progress.done > i { background: var(--accent); }
+.hours-grid { width: 100%; border-collapse: collapse; }
+.hours-grid th, .hours-grid td { padding: 6px 8px; border-bottom: 1px solid var(--border); text-align: left; }
+.hours-grid input { width: 72px; }
+.warning-list { margin: 0; padding-left: 18px; }

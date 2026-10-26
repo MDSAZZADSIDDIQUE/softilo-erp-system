@@ -50,7 +50,16 @@ export interface TimesheetInvoiceLine extends SalesLine {
   unitPrice: string;
 }
 
-const RATE_LABEL: Record<string, string> = { standard: "Standard", overtime: "Overtime", weekend: "Weekend", night: "Night" };
+const RATE_LABEL: Record<string, string> = {
+  standard: "Standard hours", overtime: "Overtime hours", weekend: "Weekend hours", night: "Night hours", day: "Days",
+};
+const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
+/** 2026-10-04 → 4 Oct 2026, as UK invoices show dates. */
+export function ukDate(iso: string): string {
+  const [y, m, day] = iso.split("-");
+  return `${Number(day)} ${MONTHS[Number(m) - 1]} ${y}`;
+}
 
 /**
  * One invoice line per timesheet and rate type, so the client sees hours × rate exactly as approved.
@@ -60,11 +69,11 @@ export function timesheetInvoiceLines(sheets: InvoiceableTimesheet[], account: s
   const lines: TimesheetInvoiceLine[] = [];
   for (const t of sheets) {
     for (const r of t.byRate) {
-      const label = RATE_LABEL[r.rateType] ?? r.rateType;
+      const label = RATE_LABEL[r.rateType] ?? `${r.rateType.charAt(0).toUpperCase()}${r.rateType.slice(1)} rate`;
       lines.push({
         net: round2(r.charge), vatCode, account,
         quantity: r.hours.toString(), unitPrice: r.chargeRate.toString(),
-        description: `${t.workerName}, ${t.jobTitle} – week ending ${t.weekEnding} – ${label} hours (${t.number})`,
+        description: `${t.workerName}, ${t.jobTitle} – week ending ${ukDate(t.weekEnding)} – ${label} (${t.number})`,
       });
     }
   }

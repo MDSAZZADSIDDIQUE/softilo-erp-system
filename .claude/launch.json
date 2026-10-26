@@ -12,6 +12,18 @@
       "runtimeExecutable": "pnpm",
       "runtimeArgs": ["--filter", "@softilo/web", "dev"],
       "port": 3000
+    },
+    {
+      "name": "recruitment-api",
+      "runtimeExecutable": "pnpm",
+      "runtimeArgs": ["--filter", "@softilo/recruitment-api", "dev"],
+      "port": 4070
+    },
+    {
+      "name": "recruitment-web",
+      "runtimeExecutable": "pnpm",
+      "runtimeArgs": ["--filter", "@softilo/recruitment-web", "dev"],
+      "port": 3070
     }
   ]
 }

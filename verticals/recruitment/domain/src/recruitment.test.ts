@@ -142,7 +142,7 @@ describe("postings", () => {
     ]);
     const lines = timesheetInvoiceLines([{ number: "TS-00001", weekEnding: "2026-10-11", workerName: "Sam Okafor", jobTitle: "Warehouse operative", byRate: p.byRate }], "4010");
     expect(lines.map((l) => [l.quantity, l.unitPrice, d(l.net).toFixed(2)])).toEqual([["37.5", "19.75", "740.63"], ["4", "29.63", "118.52"]]);
-    expect(lines[0]!.description).toBe("Sam Okafor, Warehouse operative – week ending 2026-10-11 – Standard hours (TS-00001)");
+    expect(lines[0]!.description).toBe("Sam Okafor, Warehouse operative – week ending 11 Oct 2026 – Standard hours (TS-00001)");
     const inv = postSalesInvoice(roleMap(), { date: "2026-10-12", reference: "INV-1", rate: 1, lines });
     expect(isBalanced(inv.journal.lines)).toBe(true);
     expect(inv.total.toFixed(2)).toBe("1030.98"); // 859.15 + VAT 148.13 + 23.70
