@@ -5,7 +5,9 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useState } from "react";
 import { api, useApi } from "@/lib/api";
 
-const NAV: { group: string; items: { href: string; label: string }[] }[] = [
+export type NavGroup = { group: string; items: { href: string; label: string }[] };
+
+const NAV: NavGroup[] = [
   { group: "Overview", items: [{ href: "/", label: "Dashboard" }] },
   { group: "Sales", items: [
     { href: "/invoices", label: "Invoices & credits" },
@@ -43,11 +45,14 @@ function isActive(pathname: string, kind: string | null, href: string): boolean 
   return pathname === base || pathname.startsWith(`${base}/`);
 }
 
-export function Shell({ children }: { children: React.ReactNode }) {
+/** `extraNav` lets a sector edition add its own sections; they appear before "Accounting". */
+export function Shell({ children, extraNav = [] }: { children: React.ReactNode; extraNav?: NavGroup[] }) {
   const pathname = usePathname();
   const kind = useSearchParams().get("kind");
   const router = useRouter();
   const [open, setOpen] = useState(false);
+  const at = NAV.findIndex((g) => g.group === "Accounting");
+  const nav = extraNav.length ? [...NAV.slice(0, at), ...extraNav, ...NAV.slice(at)] : NAV;
   const { data: me } = useApi<{ name: string; email: string; role: string; tenant_name: string; vat_number: string | null }>("/api/auth/me");
 
   async function signOut() {
@@ -72,7 +77,7 @@ export function Shell({ children }: { children: React.ReactNode }) {
           </div>
         )}
         <nav aria-label="Main">
-          {NAV.map((g) => (
+          {nav.map((g) => (
             <div className="nav-group" key={g.group}>
               <span>{g.group}</span>
               {g.items.map((i) => (
