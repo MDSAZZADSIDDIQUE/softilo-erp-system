@@ -8,7 +8,7 @@ import { assertAccount, audit, loadRoles, nextNumber, postJournal } from "../lib
 import { accountCode, addDays, checkRate, currency, IdParams, isoDate, positiveMoney, quantity, rate, unitPrice, uuid, vatCode } from "../lib/schemas.js";
 import { position, stockIn, stockOut } from "../lib/stock.js";
 
-const InvoiceInput = z.object({
+export const InvoiceInput = z.object({
   customerId: uuid,
   date: isoDate,
   dueDate: isoDate.optional(),
@@ -48,7 +48,7 @@ async function customer(tx: Sql, id: string) {
   return c;
 }
 
-async function createSalesDocument(tx: Sql, ctx: Ctx, kind: "invoice" | "credit", input: z.infer<typeof InvoiceInput>) {
+export async function createSalesDocument(tx: Sql, ctx: Ctx, kind: "invoice" | "credit", input: z.infer<typeof InvoiceInput>) {
   const cust = await customer(tx, input.customerId);
   const cur = input.currency ?? cust.currency;
   const r = checkRate(cur, input.rate);

@@ -30,7 +30,7 @@ const PoInput = z.object({
   })).min(1).max(500),
 });
 
-const ReceiveInput = z.object({
+export const ReceiveInput = z.object({
   date: isoDate,
   rate: rate.optional(),
   lines: z.array(z.object({ poLineId: uuid, quantity })).min(1),
@@ -136,6 +136,50 @@ export async function createBill(tx: Sql, ctx: Ctx, input: z.infer<typeof BillIn
   return { id, number, entry: entry.number };
 }
 
+/** Receive goods against an approved purchase order: stock in, GRNI journal and receipt lines, in the caller's transaction. */
+export async function receiveGoods(tx: Sql, ctx: Ctx, id: string, input: z.infer<typeof ReceiveInput>) {
+  const [po] = await tx.query<{ status: string; rate: string; warehouse_id: string; number: string }>(
+    "SELECT status, rate, warehouse_id, number FROM purchase_orders WHERE id = $1 FOR UPDATE", [id]);
+  if (!po) throw notFound("Purchase order");
+  if (!["approved", "part_received"].includes(po.status)) throw unprocessable("Approve the purchase order before receiving goods");
+  const r = input.rate ?? po.rate;
+
+  const receiptId = newId();
+  const entryId = newId();
+  const number = await nextNumber(tx, ctx, "goods_receipt");
+  const grnLines: { valueGbp: Dec; description: string }[] = [];
+  const src = { date: input.date, sourceType: "goods_receipt", sourceId: receiptId, entryId };
+  const toInsert: unknown[][] = [];
+  for (const l of input.lines) {
+    const [pl] = await tx.query<{ product_id: string; quantity: string; received_qty: string; unit_price: string; description: string }>(
+      "SELECT product_id, quantity, received_qty, unit_price, description FROM purchase_order_lines WHERE id = $1 AND po_id = $2 FOR UPDATE",
+      [l.poLineId, id]);
+    if (!pl) throw unprocessable("Purchase order line not found");
+    const outstanding = d(pl.quantity).minus(pl.received_qty);
+    if (d(l.quantity).greaterThan(outstanding)) throw unprocessable(`Only ${outstanding.toString()} of "${pl.description}" is outstanding`);
+    const valueGbp = toBase(d(l.quantity).times(pl.unit_price), r);
+    await stockIn(tx, ctx, pl.product_id, po.warehouse_id, l.quantity, valueGbp, "receipt", src);
+    await tx.query("UPDATE purchase_order_lines SET received_qty = received_qty + $2 WHERE id = $1", [l.poLineId, l.quantity]);
+    grnLines.push({ valueGbp, description: pl.description });
+    toInsert.push([newId(), ctx.tenantId, receiptId, l.poLineId, pl.product_id, l.quantity,
+      toFixed(round6(d(pl.unit_price).times(r)), 6), toFixed(valueGbp)]);
+  }
+  const posting = postGoodsReceipt(await loadRoles(tx), { date: input.date, reference: `${number} (${po.number})`, lines: grnLines });
+  await postJournal(tx, ctx, posting, { type: "goods_receipt", id: receiptId, entryId });
+  await tx.query(
+    "INSERT INTO goods_receipts (id, tenant_id, number, po_id, warehouse_id, date, entry_id) VALUES ($1,$2,$3,$4,$5,$6,$7)",
+    [receiptId, ctx.tenantId, number, id, po.warehouse_id, input.date, entryId]);
+  for (const row of toInsert) {
+    await tx.query(
+      `INSERT INTO goods_receipt_lines (id, tenant_id, receipt_id, po_line_id, product_id, quantity, unit_cost_gbp, value_gbp)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`, row);
+  }
+  const [open] = await tx.query("SELECT 1 FROM purchase_order_lines WHERE po_id = $1 AND received_qty < quantity LIMIT 1", [id]);
+  await tx.query("UPDATE purchase_orders SET status = $2 WHERE id = $1", [id, open ? "part_received" : "received"]);
+  await audit(tx, ctx, "goods_receipt.posted", "goods_receipt", receiptId, { number, po: po.number });
+  return { id: receiptId, number };
+}
+
 export async function registerPurchasing(app: FastifyInstance) {
   // ---------------------------------------------------------------- purchase orders
   app.get("/api/purchase-orders", (req) => inTenant(req, (tx) => tx.query(
@@ -209,47 +253,7 @@ export async function registerPurchasing(app: FastifyInstance) {
   app.post("/api/purchase-orders/:id/receive", (req, reply) => inTenant(req, async (tx, ctx) => {
     requireWrite(ctx, "operations");
     const { id } = IdParams.parse(req.params);
-    const input = ReceiveInput.parse(req.body);
-    const [po] = await tx.query<{ status: string; rate: string; warehouse_id: string; number: string }>(
-      "SELECT status, rate, warehouse_id, number FROM purchase_orders WHERE id = $1 FOR UPDATE", [id]);
-    if (!po) throw notFound("Purchase order");
-    if (!["approved", "part_received"].includes(po.status)) throw unprocessable("Approve the purchase order before receiving goods");
-    const r = input.rate ?? po.rate;
-
-    const receiptId = newId();
-    const entryId = newId();
-    const number = await nextNumber(tx, ctx, "goods_receipt");
-    const grnLines: { valueGbp: Dec; description: string }[] = [];
-    const src = { date: input.date, sourceType: "goods_receipt", sourceId: receiptId, entryId };
-    const toInsert: unknown[][] = [];
-    for (const l of input.lines) {
-      const [pl] = await tx.query<{ product_id: string; quantity: string; received_qty: string; unit_price: string; description: string }>(
-        "SELECT product_id, quantity, received_qty, unit_price, description FROM purchase_order_lines WHERE id = $1 AND po_id = $2 FOR UPDATE",
-        [l.poLineId, id]);
-      if (!pl) throw unprocessable("Purchase order line not found");
-      const outstanding = d(pl.quantity).minus(pl.received_qty);
-      if (d(l.quantity).greaterThan(outstanding)) throw unprocessable(`Only ${outstanding.toString()} of "${pl.description}" is outstanding`);
-      const valueGbp = toBase(d(l.quantity).times(pl.unit_price), r);
-      await stockIn(tx, ctx, pl.product_id, po.warehouse_id, l.quantity, valueGbp, "receipt", src);
-      await tx.query("UPDATE purchase_order_lines SET received_qty = received_qty + $2 WHERE id = $1", [l.poLineId, l.quantity]);
-      grnLines.push({ valueGbp, description: pl.description });
-      toInsert.push([newId(), ctx.tenantId, receiptId, l.poLineId, pl.product_id, l.quantity,
-        toFixed(round6(d(pl.unit_price).times(r)), 6), toFixed(valueGbp)]);
-    }
-    const posting = postGoodsReceipt(await loadRoles(tx), { date: input.date, reference: `${number} (${po.number})`, lines: grnLines });
-    await postJournal(tx, ctx, posting, { type: "goods_receipt", id: receiptId, entryId });
-    await tx.query(
-      "INSERT INTO goods_receipts (id, tenant_id, number, po_id, warehouse_id, date, entry_id) VALUES ($1,$2,$3,$4,$5,$6,$7)",
-      [receiptId, ctx.tenantId, number, id, po.warehouse_id, input.date, entryId]);
-    for (const row of toInsert) {
-      await tx.query(
-        `INSERT INTO goods_receipt_lines (id, tenant_id, receipt_id, po_line_id, product_id, quantity, unit_cost_gbp, value_gbp)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`, row);
-    }
-    const [open] = await tx.query("SELECT 1 FROM purchase_order_lines WHERE po_id = $1 AND received_qty < quantity LIMIT 1", [id]);
-    await tx.query("UPDATE purchase_orders SET status = $2 WHERE id = $1", [id, open ? "part_received" : "received"]);
-    await audit(tx, ctx, "goods_receipt.posted", "goods_receipt", receiptId, { number, po: po.number });
-    return reply.status(201).send({ id: receiptId, number });
+    return reply.status(201).send(await receiveGoods(tx, ctx, id, ReceiveInput.parse(req.body)));
   }));
 
   /** Receipt lines not yet billed, for building a supplier bill. */

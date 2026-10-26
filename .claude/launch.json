@@ -4,14 +4,42 @@
     {
       "name": "api",
       "runtimeExecutable": "pnpm",
-      "runtimeArgs": ["--filter", "@softilo/api", "dev"],
+      "runtimeArgs": [
+        "--filter",
+        "@softilo/api",
+        "dev"
+      ],
       "port": 4000
     },
     {
       "name": "web",
       "runtimeExecutable": "pnpm",
-      "runtimeArgs": ["--filter", "@softilo/web", "dev"],
+      "runtimeArgs": [
+        "--filter",
+        "@softilo/web",
+        "dev"
+      ],
       "port": 3000
+    },
+    {
+      "name": "fnb-api",
+      "runtimeExecutable": "pnpm",
+      "runtimeArgs": [
+        "--filter",
+        "@softilo/fnb-api",
+        "dev"
+      ],
+      "port": 4010
+    },
+    {
+      "name": "fnb-web",
+      "runtimeExecutable": "pnpm",
+      "runtimeArgs": [
+        "--filter",
+        "@softilo/fnb-web",
+        "dev"
+      ],
+      "port": 3010
     }
   ]
 }
