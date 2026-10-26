@@ -235,13 +235,28 @@ function splitJson(s: ReturnType<typeof splitPayout>) {
   };
 }
 
+/**
+ * Per-order figures after returns: net sales less credit notes, cost of goods less restocked items
+ * (written-off items stay a cost), and what the channel still owes (invoice less open refunds).
+ */
+const ORDER_FIGURES = `
+  SELECT o.id AS order_id, o.channel_id,
+         (SELECT coalesce(sum(l.net), 0) FROM sales_invoice_lines l WHERE l.invoice_id = o.invoice_id)
+           - (SELECT coalesce(sum(l.net), 0) FROM sales_invoice_lines l JOIN sales_invoices cn ON cn.id = l.invoice_id
+               WHERE cn.credits_id = o.invoice_id AND cn.kind = 'credit') AS net,
+         (SELECT coalesce(sum(l.cost_gbp), 0) FROM sales_invoice_lines l WHERE l.invoice_id = o.invoice_id)
+           - (SELECT coalesce(sum(r.cost_gbp), 0) FROM ecom_return_lines r JOIN ecom_returns x ON x.id = r.return_id
+               WHERE x.order_id = o.id AND r.disposition = 'restock') AS cost,
+         (SELECT coalesce(sum(CASE WHEN s.kind = 'invoice' THEN s.total - s.amount_paid ELSE s.amount_paid - s.total END), 0)
+            FROM sales_invoices s WHERE s.id = o.invoice_id OR (s.credits_id = o.invoice_id AND s.kind = 'credit')) AS outstanding
+    FROM ecom_orders o`;
+
 export async function registerEcommerce(app: FastifyInstance) {
   // ---------------------------------------------------------------- channels
   app.get("/api/ecommerce/channels", (req) => inTenant(req, (tx) => tx.query(
     `SELECT c.*, w.code AS warehouse_code,
             (SELECT count(*) FROM ecom_orders o WHERE o.channel_id = c.id) AS orders,
-            (SELECT coalesce(sum(i.total - i.amount_paid), 0) FROM ecom_orders o JOIN sales_invoices i ON i.id = o.invoice_id
-              WHERE o.channel_id = c.id) AS awaiting_payout,
+            (SELECT coalesce(sum(f.outstanding), 0) FROM (${ORDER_FIGURES}) f WHERE f.channel_id = c.id) AS awaiting_payout,
             (SELECT max(date) FROM ecom_payouts p WHERE p.channel_id = c.id) AS last_payout
        FROM ecom_channels c JOIN warehouses w ON w.id = c.warehouse_id ORDER BY c.name`)));
 
@@ -303,10 +318,10 @@ export async function registerEcommerce(app: FastifyInstance) {
     return tx.query(
       `SELECT o.id, o.order_number, o.date, o.customer_name, o.ship_country, o.vat_treatment, o.total, o.currency,
               c.name AS channel_name, c.kind AS channel_kind, i.id AS invoice_id, i.number AS invoice_number, i.amount_paid,
-              (SELECT coalesce(sum(net), 0) FROM sales_invoice_lines l WHERE l.invoice_id = i.id) AS net,
-              (SELECT coalesce(sum(cost_gbp), 0) FROM sales_invoice_lines l WHERE l.invoice_id = i.id) AS cost,
+              f.net, f.cost, f.outstanding,
               (SELECT coalesce(sum(refund), 0) FROM ecom_returns r WHERE r.order_id = o.id) AS refunded
          FROM ecom_orders o JOIN ecom_channels c ON c.id = o.channel_id JOIN sales_invoices i ON i.id = o.invoice_id
+         JOIN (${ORDER_FIGURES}) f ON f.order_id = o.id
         WHERE ($1::uuid IS NULL OR o.channel_id = $1) ORDER BY o.date DESC, o.order_number DESC`, [q.channelId ?? null]);
   }));
 
@@ -315,8 +330,9 @@ export async function registerEcommerce(app: FastifyInstance) {
     const [o] = await tx.query<{ invoice_id: string }>(
       `SELECT o.id, o.external_id, o.order_number, o.date, o.customer_name, o.customer_email, o.ship_country, o.vat_treatment,
               o.total, o.currency, o.invoice_id, c.name AS channel_name, c.kind AS channel_kind, i.number AS invoice_number,
-              i.amount_paid, i.total AS invoice_total
-         FROM ecom_orders o JOIN ecom_channels c ON c.id = o.channel_id JOIN sales_invoices i ON i.id = o.invoice_id WHERE o.id = $1`, [id]);
+              i.amount_paid, i.total AS invoice_total, f.net, f.cost, f.outstanding
+         FROM ecom_orders o JOIN ecom_channels c ON c.id = o.channel_id JOIN sales_invoices i ON i.id = o.invoice_id
+         JOIN (${ORDER_FIGURES}) f ON f.order_id = o.id WHERE o.id = $1`, [id]);
     if (!o) throw notFound("Order");
     const lines = await tx.query(
       `SELECT l.id, l.line_no, l.description, l.quantity, l.unit_price, l.net, l.vat, l.vat_code, l.cost_gbp, l.product_id, p.sku,
@@ -510,9 +526,9 @@ export async function registerEcommerce(app: FastifyInstance) {
   app.get("/api/ecommerce/summary", (req) => inTenant(req, async (tx) => {
     const [s] = await tx.query<Record<string, string>>(
       `SELECT (SELECT count(*) FROM ecom_orders) AS orders,
-              (SELECT coalesce(sum(i.total - i.amount_paid), 0) FROM ecom_orders o JOIN sales_invoices i ON i.id = o.invoice_id) AS awaiting_payout,
-              (SELECT coalesce(sum(l.net), 0) FROM ecom_orders o JOIN sales_invoice_lines l ON l.invoice_id = o.invoice_id) AS net_sales,
-              (SELECT coalesce(sum(l.cost_gbp), 0) FROM ecom_orders o JOIN sales_invoice_lines l ON l.invoice_id = o.invoice_id) AS cost,
+              (SELECT coalesce(sum(outstanding), 0) FROM (${ORDER_FIGURES}) f) AS awaiting_payout,
+              (SELECT coalesce(sum(net), 0) FROM (${ORDER_FIGURES}) f) AS net_sales,
+              (SELECT coalesce(sum(cost), 0) FROM (${ORDER_FIGURES}) f) AS cost,
               (SELECT coalesce(sum(fees_net), 0) FROM ecom_payouts) AS fees,
               (SELECT count(*) FROM ecom_returns r JOIN sales_invoices cn ON cn.id = r.credit_note_id
                 WHERE cn.amount_paid < cn.total AND r.refund_due_by < current_date) AS overdue_refunds`);

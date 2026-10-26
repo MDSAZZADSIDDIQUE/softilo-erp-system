@@ -4,14 +4,52 @@
     {
       "name": "api",
       "runtimeExecutable": "pnpm",
-      "runtimeArgs": ["--filter", "@softilo/api", "dev"],
+      "runtimeArgs": [
+        "--filter",
+        "@softilo/api",
+        "dev"
+      ],
       "port": 4000
     },
     {
       "name": "web",
       "runtimeExecutable": "pnpm",
-      "runtimeArgs": ["--filter", "@softilo/web", "dev"],
+      "runtimeArgs": [
+        "--filter",
+        "@softilo/web",
+        "dev"
+      ],
       "port": 3000
+    },
+    {
+      "name": "ecommerce-api",
+      "runtimeExecutable": "pnpm",
+      "runtimeArgs": [
+        "--filter",
+        "@softilo-ecommerce/api",
+        "dev"
+      ],
+      "port": 4140,
+      "env": {
+        "API_PORT": "4140"
+      }
+    },
+    {
+      "name": "ecommerce-web",
+      "runtimeExecutable": "pnpm",
+      "runtimeArgs": [
+        "--filter",
+        "@softilo-ecommerce/web",
+        "exec",
+        "next",
+        "dev",
+        "--port",
+        "3140"
+      ],
+      "port": 3140,
+      "env": {
+        "API_URL": "http://127.0.0.1:4140"
+      }
     }
   ]
 }

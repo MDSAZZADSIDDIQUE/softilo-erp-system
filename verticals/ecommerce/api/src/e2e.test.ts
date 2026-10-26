@@ -168,6 +168,11 @@ describe("e-commerce vertical slice", () => {
     const returns = await c.ok("GET", "/api/ecommerce/returns") as { order_number: string; refunded: boolean }[];
     expect(returns.find((x) => x.order_number === "#1002")!.refunded).toBe(true);
     expect(returns.find((x) => x.order_number === "#1001")!.refunded).toBe(false);
+    // Figures after returns: Shopify will net the open £19.80 refund off its next payout.
+    expect(await c.ok("GET", "/api/ecommerce/summary")).toMatchObject({ awaiting_payout: "-19.80", net_sales: "53.15", cost: "26.00", margin: "27.15" });
+    const o1 = (await c.ok("GET", "/api/ecommerce/orders") as { order_number: string; net: string; cost: string; outstanding: string }[])
+      .find((o) => o.order_number === "#1001")!;
+    expect([o1.net, o1.cost, o1.outstanding]).toEqual(["19.82", "8.00", "-19.80"]);
     await expectBooksIntact(c);
   });
 
