@@ -12,6 +12,18 @@
       "runtimeExecutable": "pnpm",
       "runtimeArgs": ["--filter", "@softilo/web", "dev"],
       "port": 3000
+    },
+    {
+      "name": "construction-api",
+      "runtimeExecutable": "pnpm",
+      "runtimeArgs": ["--filter", "@softilo/construction-api", "dev"],
+      "port": 4010
+    },
+    {
+      "name": "construction-web",
+      "runtimeExecutable": "pnpm",
+      "runtimeArgs": ["--filter", "@softilo/construction-web", "dev"],
+      "port": 3010
     }
   ]
 }
