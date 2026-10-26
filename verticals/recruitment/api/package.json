@@ -1,0 +1,28 @@
+{
+  "name": "@softilo/recruitment-api",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "dev": "tsx watch src/main.ts",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@softilo/api": "workspace:*",
+    "@softilo/db": "workspace:*",
+    "@softilo/domain": "workspace:*",
+    "@softilo/recruitment-domain": "workspace:*",
+    "fastify": "^5.12.7",
+    "zod": "^4.6.7"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.5",
+    "tsx": "^4.23.15",
+    "typescript": "~5.9.0",
+    "vitest": "^5.0.5"
+  }
+}
