@@ -5,7 +5,9 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useState } from "react";
 import { api, useApi } from "@/lib/api";
 
-const NAV: { group: string; items: { href: string; label: string }[] }[] = [
+export type NavGroup = { group: string; items: { href: string; label: string }[] };
+
+export const NAV: NavGroup[] = [
   { group: "Overview", items: [{ href: "/", label: "Dashboard" }] },
   { group: "Sales", items: [
     { href: "/invoices", label: "Invoices & credits" },
@@ -43,7 +45,8 @@ function isActive(pathname: string, kind: string | null, href: string): boolean 
   return pathname === base || pathname.startsWith(`${base}/`);
 }
 
-export function Shell({ children }: { children: React.ReactNode }) {
+/** `nav` lets a sector edition (see verticals/) add its own menu groups. */
+export function Shell({ children, nav = NAV }: { children: React.ReactNode; nav?: NavGroup[] }) {
   const pathname = usePathname();
   const kind = useSearchParams().get("kind");
   const router = useRouter();
@@ -72,7 +75,7 @@ export function Shell({ children }: { children: React.ReactNode }) {
           </div>
         )}
         <nav aria-label="Main">
-          {NAV.map((g) => (
+          {nav.map((g) => (
             <div className="nav-group" key={g.group}>
               <span>{g.group}</span>
               {g.items.map((i) => (

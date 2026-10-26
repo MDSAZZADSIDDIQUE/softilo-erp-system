@@ -1,0 +1,9 @@
+/* Pharma edition additions. Tokens come from the core globals.css; Signal orange stays the only accent. */
+.batch-line { display: grid; grid-template-columns: 1.4fr 0.8fr 1fr 1fr 0.9fr auto; gap: 8px; align-items: end; }
+.timeline { list-style: none; margin: 0; padding: 0; }
+.timeline li { padding: 10px 0; border-bottom: 1px solid var(--border); }
+.timeline li:last-child { border-bottom: 0; }
+.notice { border-left: 3px solid var(--accent); padding: 10px 14px; background: var(--accent-soft); color: var(--text); border-radius: var(--radius-sm); }
+@media (max-width: 720px) {
+  .batch-line { grid-template-columns: 1fr 1fr; }
+}
