@@ -109,6 +109,59 @@ importers:
         specifier: ^5.0.5
         version: 5.0.5(@types/node@26.6.5)(vite@8.3.5(@types/node@26.6.5)(esbuild@0.28.2)(tsx@4.23.15))
 
+  verticals/ecommerce/api:
+    dependencies:
+      '@softilo-ecommerce/domain':
+        specifier: workspace:*
+        version: link:../domain
+      '@softilo/api':
+        specifier: workspace:*
+        version: link:../../../apps/api
+      '@softilo/db':
+        specifier: workspace:*
+        version: link:../../../packages/db
+      '@softilo/domain':
+        specifier: workspace:*
+        version: link:../../../packages/domain
+      fastify:
+        specifier: ^5.12.7
+        version: 5.12.7
+      zod:
+        specifier: ^4.6.7
+        version: 4.6.7
+    devDependencies:
+      '@types/node':
+        specifier: ^26.6.5
+        version: 26.6.5
+      tsx:
+        specifier: ^4.23.15
+        version: 4.23.15
+      typescript:
+        specifier: ~5.9.0
+        version: 5.9.3
+      vitest:
+        specifier: ^5.0.5
+        version: 5.0.5(@types/node@26.6.5)(vite@8.3.5(@types/node@26.6.5)(esbuild@0.28.2)(tsx@4.23.15))
+
+  verticals/ecommerce/domain:
+    dependencies:
+      '@softilo/domain':
+        specifier: workspace:*
+        version: link:../../../packages/domain
+    devDependencies:
+      '@types/node':
+        specifier: ^26.6.5
+        version: 26.6.5
+      fast-check:
+        specifier: ^4.10.2
+        version: 4.10.2
+      typescript:
+        specifier: ~5.9.0
+        version: 5.9.3
+      vitest:
+        specifier: ^5.0.5
+        version: 5.0.5(@types/node@26.6.5)(vite@8.3.5(@types/node@26.6.5)(esbuild@0.28.2)(tsx@4.23.15))
+
 packages:
 
   '@electric-sql/pglite@0.5.11':

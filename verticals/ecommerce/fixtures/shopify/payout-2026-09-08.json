@@ -1,0 +1,11 @@
+{
+  "payout": { "id": 88001, "status": "paid", "date": "2026-09-08", "currency": "GBP", "amount": "76.32" },
+  "transactions": [
+    { "id": 90001, "type": "charge", "source_order_id": 6001000001, "currency": "GBP", "amount": "43.59", "fee": "0.90", "net": "42.69" },
+    { "id": 90002, "type": "charge", "source_order_id": 6001000002, "currency": "GBP", "amount": "18.00", "fee": "0.52", "net": "17.48" },
+    { "id": 90003, "type": "charge", "source_order_id": 6001000003, "currency": "GBP", "amount": "40.00", "fee": "0.85", "net": "39.15" },
+    { "id": 90004, "type": "refund", "source_order_id": 6001000002, "currency": "GBP", "amount": "-18.00", "fee": "0.00", "net": "-18.00" },
+    { "id": 90005, "type": "reserve", "source_order_id": null, "currency": "GBP", "amount": "-5.00", "fee": "0.00", "net": "-5.00" },
+    { "id": 90006, "type": "payout", "source_order_id": null, "currency": "GBP", "amount": "-76.32", "fee": "0.00", "net": "-76.32" }
+  ]
+}

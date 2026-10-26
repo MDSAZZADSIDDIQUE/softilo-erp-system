@@ -1,5 +1,5 @@
 import type { Database } from "@softilo/db";
-import Fastify, { type FastifyServerOptions } from "fastify";
+import Fastify, { type FastifyInstance, type FastifyServerOptions } from "fastify";
 import { registerErrorHandler } from "./lib/errors.js";
 import { registerAuth } from "./modules/auth.js";
 import { registerBanking } from "./modules/banking.js";
@@ -9,7 +9,10 @@ import { registerPurchasing } from "./modules/purchasing.js";
 import { registerSales } from "./modules/sales.js";
 import { registerVat } from "./modules/vat.js";
 
-export async function buildServer(db: Database, opts: FastifyServerOptions = {}) {
+/** A sector edition's routes, registered after the core modules (see verticals/*). */
+export type ModuleRegistrar = (app: FastifyInstance) => Promise<void> | void;
+
+export async function buildServer(db: Database, opts: FastifyServerOptions = {}, modules: ModuleRegistrar[] = []) {
   const app = Fastify({ bodyLimit: 6 * 1024 * 1024, trustProxy: true, ...opts });
   app.decorate("db", db);
   registerErrorHandler(app);
@@ -21,5 +24,6 @@ export async function buildServer(db: Database, opts: FastifyServerOptions = {})
   await registerBanking(app);
   await registerVat(app);
   await registerLedger(app);
+  for (const register of modules) await register(app);
   return app;
 }
