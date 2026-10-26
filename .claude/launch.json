@@ -4,14 +4,42 @@
     {
       "name": "api",
       "runtimeExecutable": "pnpm",
-      "runtimeArgs": ["--filter", "@softilo/api", "dev"],
+      "runtimeArgs": [
+        "--filter",
+        "@softilo/api",
+        "dev"
+      ],
       "port": 4000
     },
     {
       "name": "web",
       "runtimeExecutable": "pnpm",
-      "runtimeArgs": ["--filter", "@softilo/web", "dev"],
+      "runtimeArgs": [
+        "--filter",
+        "@softilo/web",
+        "dev"
+      ],
       "port": 3000
+    },
+    {
+      "name": "law-api",
+      "runtimeExecutable": "pnpm",
+      "runtimeArgs": [
+        "--filter",
+        "@softilo-law/api",
+        "dev"
+      ],
+      "port": 4060
+    },
+    {
+      "name": "law-web",
+      "runtimeExecutable": "pnpm",
+      "runtimeArgs": [
+        "--filter",
+        "@softilo-law/web",
+        "dev"
+      ],
+      "port": 3060
     }
   ]
 }
