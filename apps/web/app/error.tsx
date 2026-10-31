@@ -8,7 +8,7 @@ export default function ErrorPage({ error, reset }: { error: Error & { digest?: 
   return (
     <main className="state-page">
       <div>
-        <img src="/brand/symbol.svg" alt="" />
+        <img className="logo-on-light" src="/brand/symbol.svg" alt="" /><img className="logo-on-dark" src="/brand/symbol-reversed.svg" alt="" />
         <h1>Something went wrong</h1>
         <p>This page hit a problem. Nothing you already saved has been lost.</p>
         <div className="actions">

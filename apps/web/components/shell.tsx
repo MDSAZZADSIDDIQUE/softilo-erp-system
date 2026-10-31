@@ -65,6 +65,7 @@ export function Shell({ children }: { children: React.ReactNode }) {
       <aside id="sidebar" className={`sidebar${open ? " open" : ""}`} onClick={(e) => { if ((e.target as HTMLElement).closest("a")) setOpen(false); }}>
         <Link href="/" className="brand" aria-label="Softilo home">
           <img src="/brand/logo-reversed.svg" alt="Softilo" />
+          <span className="product">ERP</span>
         </Link>
         {me && (
           <div className="company">
