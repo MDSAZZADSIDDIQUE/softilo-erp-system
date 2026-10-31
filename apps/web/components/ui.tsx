@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import type { ReactNode } from "react";
 import { money } from "@/lib/format";
+import { InboxIcon, type SoftiloIcon } from "@/components/softilo-icons";
 
 export function PageHeader({ title, subtitle, children }: { title: string; subtitle?: ReactNode; children?: ReactNode }) {
   return (
@@ -31,10 +32,10 @@ export function Card({ title, actions, children, pad = false }: { title?: ReactN
   );
 }
 
-export function Stat({ label, value, sub, alert, href }: { label: string; value: ReactNode; sub?: ReactNode; alert?: boolean; href?: string }) {
+export function Stat({ icon: Icon, label, value, sub, alert, href }: { icon?: SoftiloIcon; label: string; value: ReactNode; sub?: ReactNode; alert?: boolean; href?: string }) {
   const body = (
     <div className={`card stat${alert ? " alert" : ""}`}>
-      <div className="label">{label}</div>
+      <div className="label">{Icon && <Icon size={18} />}{label}</div>
       <div className="value">{value}</div>
       {sub && <div className="sub">{sub}</div>}
     </div>
@@ -77,7 +78,7 @@ export function paymentStatus(doc: { total: string; amount_paid: string; overdue
 }
 
 export function Empty({ title, children }: { title: string; children?: ReactNode }) {
-  return <div className="empty"><strong>{title}</strong>{children}</div>;
+  return <div className="empty"><InboxIcon size={32} /><strong>{title}</strong>{children}</div>;
 }
 
 export function Loading({ rows = 4 }: { rows?: number }) {

@@ -134,7 +134,7 @@ function Integrity() {
 
 function RangePicker({ range, onChange }: { range: { from: string; to: string }; onChange: (r: { from: string; to: string }) => void }) {
   return (
-    <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+    <div style={{ display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center" }}>
       <input type="date" value={range.from} onChange={(e) => onChange({ ...range, from: e.target.value })} aria-label="From" />
       <span className="muted">to</span>
       <input type="date" value={range.to} onChange={(e) => onChange({ ...range, to: e.target.value })} aria-label="To" />

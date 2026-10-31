@@ -4,13 +4,21 @@
     {
       "name": "api",
       "runtimeExecutable": "pnpm",
-      "runtimeArgs": ["--filter", "@softilo/api", "dev"],
+      "runtimeArgs": [
+        "--filter",
+        "@softilo/api",
+        "dev"
+      ],
       "port": 4000
     },
     {
       "name": "web",
       "runtimeExecutable": "pnpm",
-      "runtimeArgs": ["--filter", "@softilo/web", "dev"],
+      "runtimeArgs": [
+        "--filter",
+        "@softilo/web",
+        "dev"
+      ],
       "port": 3000
     }
   ]

@@ -10,7 +10,8 @@ const roboto = Roboto({
 });
 
 export const metadata: Metadata = {
-  title: { default: "Softilo", template: "%s · Softilo" },
+  robots: { index: false, follow: false },
+  title: { default: "Softilo ERP", template: "%s · Softilo ERP" },
   description: "Accounts, stock and landed cost for UK importers and wholesalers.",
 };
 

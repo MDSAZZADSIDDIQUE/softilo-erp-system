@@ -4,35 +4,36 @@ import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useState } from "react";
 import { api, useApi } from "@/lib/api";
+import { AccountsIcon, AuditIcon, BankIcon, BanknoteIcon, BoxIcon, ClipboardIcon, CustomersIcon, DashboardIcon, InvoiceIcon, JournalIcon, MenuIcon, PercentIcon, ReceiptIcon, ReportsIcon, SettingsIcon, ShipIcon, SignOutIcon, WarehouseIcon, type SoftiloIcon } from "@/components/softilo-icons";
 
-const NAV: { group: string; items: { href: string; label: string }[] }[] = [
-  { group: "Overview", items: [{ href: "/", label: "Dashboard" }] },
+const NAV: { group: string; items: { href: string; label: string; icon: SoftiloIcon }[] }[] = [
+  { group: "Overview", items: [{ href: "/", label: "Dashboard", icon: DashboardIcon }] },
   { group: "Sales", items: [
-    { href: "/invoices", label: "Invoices & credits" },
-    { href: "/contacts?kind=customer", label: "Customers" },
+    { href: "/invoices", label: "Invoices & credits", icon: InvoiceIcon },
+    { href: "/contacts?kind=customer", label: "Customers", icon: CustomersIcon },
   ] },
   { group: "Purchasing", items: [
-    { href: "/purchase-orders", label: "Purchase orders" },
-    { href: "/bills", label: "Supplier bills" },
-    { href: "/shipments", label: "Shipments & landed cost" },
-    { href: "/contacts?kind=supplier", label: "Suppliers" },
+    { href: "/purchase-orders", label: "Purchase orders", icon: ClipboardIcon },
+    { href: "/bills", label: "Supplier bills", icon: ReceiptIcon },
+    { href: "/shipments", label: "Shipments & landed cost", icon: ShipIcon },
+    { href: "/contacts?kind=supplier", label: "Suppliers", icon: WarehouseIcon },
   ] },
   { group: "Inventory", items: [
-    { href: "/products", label: "Products & stock" },
+    { href: "/products", label: "Products & stock", icon: BoxIcon },
   ] },
   { group: "Banking", items: [
-    { href: "/banking", label: "Bank reconciliation" },
-    { href: "/payments", label: "Payments & receipts" },
+    { href: "/banking", label: "Bank reconciliation", icon: BankIcon },
+    { href: "/payments", label: "Payments & receipts", icon: BanknoteIcon },
   ] },
   { group: "Accounting", items: [
-    { href: "/vat", label: "VAT" },
-    { href: "/reports", label: "Reports" },
-    { href: "/journals", label: "Journals" },
-    { href: "/accounts", label: "Chart of accounts" },
+    { href: "/vat", label: "VAT", icon: PercentIcon },
+    { href: "/reports", label: "Reports", icon: ReportsIcon },
+    { href: "/journals", label: "Journals", icon: JournalIcon },
+    { href: "/accounts", label: "Chart of accounts", icon: AccountsIcon },
   ] },
   { group: "Company", items: [
-    { href: "/settings", label: "Settings" },
-    { href: "/audit", label: "Audit trail" },
+    { href: "/settings", label: "Settings", icon: SettingsIcon },
+    { href: "/audit", label: "Audit trail", icon: AuditIcon },
   ] },
 ];
 
@@ -59,7 +60,7 @@ export function Shell({ children }: { children: React.ReactNode }) {
     <div className="shell">
       <div className="mobile-bar">
         <img src="/brand/logo-reversed.svg" alt="Softilo" />
-        <button onClick={() => setOpen((o) => !o)} aria-expanded={open} aria-controls="sidebar">Menu</button>
+        <button onClick={() => setOpen((o) => !o)} aria-expanded={open} aria-controls="sidebar"><MenuIcon size={18} />Menu</button>
       </div>
       <aside id="sidebar" className={`sidebar${open ? " open" : ""}`} onClick={(e) => { if ((e.target as HTMLElement).closest("a")) setOpen(false); }}>
         <Link href="/" className="brand" aria-label="Softilo home">
@@ -75,11 +76,16 @@ export function Shell({ children }: { children: React.ReactNode }) {
           {NAV.map((g) => (
             <div className="nav-group" key={g.group}>
               <span>{g.group}</span>
-              {g.items.map((i) => (
-                <Link key={i.href} href={i.href} className={`nav-link${isActive(pathname, kind, i.href) ? " active" : ""}`}>
-                  {i.label}
-                </Link>
-              ))}
+              {g.items.map((i) => {
+                const active = isActive(pathname, kind, i.href);
+                return (
+                  <Link key={i.href} href={i.href} className={`nav-link${active ? " active" : ""}`}>
+                    {/* The current page's icon is filled signal orange. */}
+                    <i.icon tint={active ? "var(--signal)" : "currentColor"} tintOpacity={active ? 0.9 : undefined} />
+                    {i.label}
+                  </Link>
+                );
+              })}
             </div>
           ))}
         </nav>
@@ -88,7 +94,7 @@ export function Shell({ children }: { children: React.ReactNode }) {
           <div className="user">
             <div>{me.name}</div>
             <div style={{ color: "var(--sidebar-muted)", fontSize: 12, marginBottom: 6, textTransform: "capitalize" }}>{me.role}</div>
-            <button onClick={signOut}>Sign out</button>
+            <button onClick={signOut}><SignOutIcon size={16} />Sign out</button>
           </div>
         )}
       </aside>

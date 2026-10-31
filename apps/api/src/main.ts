@@ -4,6 +4,10 @@ import { createDatabase, migrate } from "@softilo/db";
 import { buildServer } from "./server.js";
 
 const url = process.env.DATABASE_URL || undefined;
+if (!url && process.env.NODE_ENV === "production" && process.env.DEMO_MODE !== "1") {
+  console.error("DATABASE_URL is required in production. The embedded database is for evaluation only (set DEMO_MODE=1 for a demo server).");
+  process.exit(1);
+}
 // Without DATABASE_URL, use an embedded PGlite database on disk (development only).
 const dataDir = url ? undefined : resolve(process.env.PGLITE_DIR ?? "../../.data/pglite");
 if (dataDir) mkdirSync(dataDir, { recursive: true });

@@ -8,19 +8,32 @@ export class ApiError extends Error {
   }
 }
 
-export async function api<T = any>(path: string, init: { method?: string; body?: unknown } = {}): Promise<T> {
-  const res = await fetch(path, {
-    method: init.method ?? (init.body !== undefined ? "POST" : "GET"),
-    headers: init.body !== undefined ? { "content-type": "application/json" } : {},
-    body: init.body !== undefined ? JSON.stringify(init.body) : undefined,
-    credentials: "same-origin",
-  });
-  if (res.status === 401 && typeof window !== "undefined" && !path.startsWith("/api/auth/")) {
-    window.location.href = `/login?next=${encodeURIComponent(window.location.pathname)}`;
+/** A proxy or crashed server can answer with plain text or HTML, so a body that isn't JSON counts as no body. */
+function parseBody(text: string): any {
+  try {
+    return text ? JSON.parse(text) : undefined;
+  } catch {
+    return undefined;
   }
-  const text = await res.text();
-  const data = text ? JSON.parse(text) : undefined;
-  if (!res.ok) throw new ApiError(res.status, data?.message ?? `Request failed (${res.status})`);
+}
+
+export async function api<T = any>(path: string, init: { method?: string; body?: unknown } = {}): Promise<T> {
+  let res: Response;
+  try {
+    res = await fetch(path, {
+      method: init.method ?? (init.body !== undefined ? "POST" : "GET"),
+      headers: init.body !== undefined ? { "content-type": "application/json" } : {},
+      body: init.body !== undefined ? JSON.stringify(init.body) : undefined,
+      credentials: "same-origin",
+    });
+  } catch {
+    throw new ApiError(0, "Can't reach the server. Check your connection and try again.");
+  }
+  if (res.status === 401 && typeof window !== "undefined" && !path.startsWith("/api/auth/")) {
+    window.location.href = `/login?next=${encodeURIComponent(window.location.pathname + window.location.search)}`;
+  }
+  const data = parseBody(await res.text());
+  if (!res.ok) throw new ApiError(res.status, data?.message ?? (res.status >= 500 ? "The server had a problem. Please try again in a moment." : `Request failed (${res.status})`));
   return data as T;
 }
 

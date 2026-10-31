@@ -119,12 +119,9 @@ h3 { font-size: 14px; }
 }
 .nav-link:hover { background: var(--sidebar-active); color: #fff; }
 .nav-link.active { background: var(--sidebar-active); color: var(--paper); font-weight: 500; }
-/* The active marker echoes the logo's signal square. */
-.nav-link::before { content: ""; width: 6px; height: 6px; background: transparent; flex: none; }
-.nav-link.active::before { background: var(--signal); }
 .sidebar .spacer { flex: 1; }
 .sidebar .user { padding: 12px 10px 0; border-top: 1px solid #2f2c25; font-size: 13px; }
-.sidebar .user button { background: none; border: 0; color: var(--sidebar-muted); padding: 0; cursor: pointer; font: inherit; font-size: 12px; }
+.sidebar .user button { display: inline-flex; align-items: center; gap: 6px; background: none; border: 0; color: var(--sidebar-muted); padding: 0; cursor: pointer; font: inherit; font-size: 12px; }
 .sidebar .user button:hover { color: var(--paper); }
 .mobile-bar { display: none; }
 
@@ -139,7 +136,7 @@ main.content { padding: 28px 36px 64px; min-width: 0; max-width: 1360px; }
     background: var(--sidebar-bg); padding: 12px 16px; position: sticky; top: 0; z-index: 20;
   }
   .mobile-bar img { height: 24px; }
-  .mobile-bar button { background: none; border: 1px solid #3a372f; color: var(--paper); border-radius: var(--radius-sm); padding: 6px 10px; font: inherit; }
+  .mobile-bar button { display: inline-flex; align-items: center; gap: 6px; background: none; border: 1px solid #3a372f; color: var(--paper); border-radius: var(--radius-sm); padding: 6px 10px; font: inherit; }
   main.content { padding: 20px 16px 48px; }
 }
 
@@ -160,7 +157,7 @@ main.content { padding: 28px 36px 64px; min-width: 0; max-width: 1360px; }
 @media (max-width: 700px) { .grid-2, .grid-3, .grid-4, .grid-main { grid-template-columns: minmax(0, 1fr); } }
 
 .stat { padding: 16px 18px; }
-.stat .label { font-size: 12px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.06em; }
+.stat .label { display: flex; align-items: center; gap: 7px; font-size: 12px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.06em; }
 .stat .value { font-size: 26px; font-weight: 500; font-variant-numeric: tabular-nums; margin-top: 6px; letter-spacing: -0.02em; }
 .stat .sub { font-size: 12px; color: var(--text-muted); margin-top: 2px; }
 /* Only the explanation turns orange: a healthy figure with something to action shouldn't look like a problem. */
@@ -240,6 +237,7 @@ table.lines input, table.lines select { padding: 7px 8px; }
 .banner.error { border-color: transparent; background: var(--accent-soft); color: var(--accent-text); }
 .banner.ok { border-left: 3px solid var(--text); }
 .empty { padding: 40px 20px; text-align: center; color: var(--text-muted); }
+.empty svg { display: block; margin: 0 auto 10px; opacity: 0.7; }
 .empty strong { display: block; color: var(--text); font-weight: 500; margin-bottom: 4px; }
 .skeleton { height: 14px; border-radius: 4px; background: var(--surface-sunken); animation: pulse 1.2s ease-in-out infinite; }
 @keyframes pulse { 50% { opacity: .5; } }
@@ -292,3 +290,30 @@ dl.meta dd { margin: 0; }
   .document { border: 0; padding: 0; }
   body { background: #fff; }
 }
+
+/* Demo sign-in on the login page */
+.demo-access { border: 1px solid var(--border-strong); border-radius: var(--radius); background: var(--surface); padding: 14px 16px; display: grid; gap: 8px; }
+.demo-access p { margin: 0; font-size: 14px; color: var(--text-muted); }
+.demo-access .btn { justify-self: start; }
+
+/* Not found and error screens */
+.state-page { min-height: 70vh; display: grid; place-items: center; padding: 32px 16px; text-align: center; }
+.state-page > div { max-width: 440px; display: grid; gap: 12px; justify-items: center; }
+.state-page img { width: 40px; height: 40px; }
+.state-page h1 { font-size: 24px; font-weight: 500; margin: 0; }
+.state-page p { margin: 0; color: var(--text-muted); }
+.state-page .actions { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; margin-top: 4px; }
+
+/* Phone width: card headers with date filters wrap instead of pushing the page sideways */
+@media (max-width: 700px) {
+  .card-header { flex-wrap: wrap; gap: 10px; }
+  .card-header .actions { flex-wrap: wrap; max-width: 100%; }
+  .card-header input[type="date"] { min-width: 0; max-width: 100%; }
+}
+
+/* Wide tables placed straight in a card scroll inside it; chart columns may shrink to fit */
+@media (max-width: 700px) {
+  .card { overflow-x: auto; }
+}
+.bars { grid-auto-columns: minmax(0, 1fr); }
+.bar-col { min-width: 0; }

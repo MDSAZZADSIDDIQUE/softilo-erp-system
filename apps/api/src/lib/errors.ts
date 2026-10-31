@@ -12,6 +12,13 @@ export const notFound = (what: string) => new AppError(404, `${what} not found`,
 export const unprocessable = (message: string) => new AppError(422, message, "unprocessable");
 export const forbidden = (message = "You do not have permission to do this") => new AppError(403, message, "forbidden");
 
+/** Our triggers raise messages written for people. Postgres' own constraint messages name tables and columns, so those are replaced. */
+function friendlyDbMessage(code: string, message: string) {
+  if (code === "23505") return "That already exists. Check for a duplicate number, code or reference.";
+  if (code === "23503") return "This refers to a record that does not exist, or is still in use elsewhere.";
+  return /violates check constraint/.test(message) ? "One of the values entered is not allowed." : message;
+}
+
 export function registerErrorHandler(app: FastifyInstance) {
   app.setErrorHandler((err: FastifyError | Error, req, reply) => {
     if (err instanceof AppError) {
@@ -30,7 +37,7 @@ export function registerErrorHandler(app: FastifyInstance) {
     // Postgres integrity rules (balanced entries, lock date, control accounts, append-only, RLS).
     const pgCode = (err as { code?: string }).code;
     if (pgCode === "23514" || pgCode === "23505" || pgCode === "23503") {
-      return reply.status(422).send({ error: "unprocessable", message: err.message });
+      return reply.status(422).send({ error: "unprocessable", message: friendlyDbMessage(pgCode, err.message) });
     }
     const status = (err as FastifyError).statusCode;
     if (status && status < 500) return reply.status(status).send({ error: "bad_request", message: err.message });

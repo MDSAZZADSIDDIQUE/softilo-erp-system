@@ -45,9 +45,26 @@ pnpm seed
 pnpm dev
 ```
 
-Then open http://localhost:3000. `pnpm seed` creates a demo importer with a few months of trading. Its sign-in details are at the top of [apps/api/src/seed.ts](apps/api/src/seed.ts).
+Then open http://localhost:3000 and choose **Open the demo**. The API runs on port 4000. Each Softilo product has its own ports, so they can run side by side.
 
 Without `DATABASE_URL`, the API uses an embedded Postgres (PGlite) stored in `.data/`. It runs the same SQL, row-level security and triggers as production. To use a real Postgres server, set `DATABASE_URL` (see [.env.example](.env.example)). The API connects as the owning role and switches to the restricted `softilo_app` role for every tenant request.
+
+## Demo company
+
+`pnpm seed` creates Thames Valley Imports Ltd: a Reading housewares importer with six months of trading: USD purchase orders at every stage, five landed shipments, one still to cost, trade invoices, credit notes, part payments, a part-reconciled bank statement, postponed import VAT and a finalised VAT return. Everything goes through the real API, so the demo obeys the same rules as live data and the ledger checks reconcile.
+
+- The login page offers the demo in development. Its details are in [apps/api/src/lib/demo.ts](apps/api/src/lib/demo.ts).
+- `pnpm seed:reset` clears the embedded database and creates the demo again. Use it to tidy up after people have tried things.
+- All companies, people and references in the demo are made up. Dates are fixed around autumn 2026 or set relative to the day you seed, so reseed a public demo now and then to keep it current.
+
+## Going live
+
+- Set `DATABASE_URL` and `NODE_ENV=production`. The API refuses to start on the embedded database in production unless `DEMO_MODE=1`.
+- Serve it over HTTPS: session cookies are marked secure in production.
+- Set `API_URL` when you run `pnpm build`, because the web app fixes where it proxies `/api` at build time.
+- Never run the seed against live data. It creates a user whose password is public, and refuses to run in production without `DEMO_MODE=1`.
+- For a public demo server, set `DEMO_MODE=1` on the API and hold nothing but demo data there.
+- Sign-in attempts are limited per email and per address in memory, so put a shared limiter in front if you run more than one API process.
 
 ## Tests
 

@@ -4,7 +4,7 @@ const plain = new Intl.NumberFormat("en-GB", { minimumFractionDigits: 2, maximum
 /** Money in accounting style: negatives in brackets. Amounts arrive as decimal strings. */
 export function money(value: string | number | null | undefined, currency = "GBP"): string {
   if (value === null || value === undefined || value === "") return "–";
-  const n = Number(value);
+  const n = Number(value) + 0; // + 0 turns "-0.00" into plain zero, which would otherwise print as -£0.00
   const f = currency === "GBP" ? gbp : new Intl.NumberFormat("en-GB", { style: "currency", currency });
   return n < 0 ? `(${f.format(-n)})` : f.format(n);
 }

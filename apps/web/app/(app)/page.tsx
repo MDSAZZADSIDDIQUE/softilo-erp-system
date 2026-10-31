@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { Card, DataTable, Empty, ErrorBanner, Loading, PageHeader, Stat } from "@/components/ui";
+import { BankIcon, BoxIcon, InvoiceIcon, PercentIcon, ReceiptIcon } from "@/components/softilo-icons";
 import { useApi } from "@/lib/api";
 import { date, money, monthLabel, qty } from "@/lib/format";
 
@@ -52,17 +53,17 @@ export default function DashboardPage() {
       {!data ? <div className="card"><Loading /></div> : (
         <>
           <div className="grid-4">
-            <Stat label="Cash at bank" value={money(data.cash)} sub={data.unreconciled ? `${data.unreconciled} bank lines to reconcile` : "Fully reconciled"} href="/banking" alert={data.unreconciled > 0} />
-            <Stat label="Owed to you" value={money(data.receivables)} sub={data.overdue.count ? `${data.overdue.count} overdue · ${money(data.overdue.value)}` : "Nothing overdue"} alert={data.overdue.count > 0} href="/reports?tab=aged-debtors" />
-            <Stat label="You owe" value={money(data.payables)} sub="Trade creditors" href="/reports?tab=aged-creditors" />
-            <Stat label="Stock value" value={money(data.stock)} sub="At landed cost" href="/reports?tab=stock" />
+            <Stat icon={BankIcon} label="Cash at bank" value={money(data.cash)} sub={data.unreconciled ? `${data.unreconciled} bank lines to reconcile` : "Fully reconciled"} href="/banking" alert={data.unreconciled > 0} />
+            <Stat icon={InvoiceIcon} label="Owed to you" value={money(data.receivables)} sub={data.overdue.count ? `${data.overdue.count} overdue · ${money(data.overdue.value)}` : "Nothing overdue"} alert={data.overdue.count > 0} href="/reports?tab=aged-debtors" />
+            <Stat icon={ReceiptIcon} label="You owe" value={money(data.payables)} sub="Trade creditors" href="/reports?tab=aged-creditors" />
+            <Stat icon={BoxIcon} label="Stock value" value={money(data.stock)} sub="At landed cost" href="/reports?tab=stock" />
           </div>
           <div className="grid-main">
             <Card title="Sales vs cost of sales">
               <SalesChart months={data.monthly} />
             </Card>
             <div className="stack">
-              <Stat label="VAT position" value={money(data.vatDue)} sub={Number(data.vatDue) >= 0 ? "Owed to HMRC on open transactions" : "Due back from HMRC"} href="/vat" />
+              <Stat icon={PercentIcon} label="VAT position" value={money(data.vatDue)} sub={Number(data.vatDue) >= 0 ? "Owed to HMRC on open transactions" : "Due back from HMRC"} href="/vat" />
               <Card pad>
                 <div className="label faint" style={{ fontSize: 12, textTransform: "uppercase", letterSpacing: ".06em" }}>Ledger checks</div>
                 <p style={{ margin: "8px 0 0" }}>

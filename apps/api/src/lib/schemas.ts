@@ -26,8 +26,9 @@ export function addDays(date: string, days: number): string {
   return d.toISOString().slice(0, 10);
 }
 
+/** The date in the UK, which is ahead of UTC for the first hour of each day in summer. */
 export function today(): string {
-  return new Date().toISOString().slice(0, 10);
+  return new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/London" }).format(new Date());
 }
 
 /** GBP documents must use rate 1; foreign-currency documents need a rate. */

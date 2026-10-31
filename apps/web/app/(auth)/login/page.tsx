@@ -6,6 +6,7 @@ import { Suspense, useState } from "react";
 import { ErrorBanner, Field } from "@/components/ui";
 import { api } from "@/lib/api";
 import { AuthSide } from "../auth-side";
+import { DemoAccess } from "../demo-access";
 
 function LoginForm() {
   const router = useRouter();
@@ -38,6 +39,7 @@ function LoginForm() {
       <Field label="Password"><input name="password" type="password" autoComplete="current-password" required /></Field>
       <button className="btn primary" disabled={busy}>{busy ? "Signing in…" : "Sign in"}</button>
       <p className="muted">New to Softilo? <Link href="/signup">Set up your company</Link></p>
+      <DemoAccess />
     </form>
   );
 }

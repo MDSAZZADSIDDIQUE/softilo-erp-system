@@ -6,12 +6,25 @@ import { UK_CHART } from "@softilo/domain";
 import type { FastifyInstance, FastifyRequest } from "fastify";
 import { z } from "zod";
 import { requireCtx, type Ctx, type Role } from "../lib/context.js";
+import { DEMO_COMPANY, DEMO_EMAIL, DEMO_PASSWORD, demoEnabled } from "../lib/demo.js";
 import { AppError } from "../lib/errors.js";
 import { audit } from "../lib/ledger.js";
+import { RateLimiter } from "../lib/rate-limit.js";
 
 const scrypt = promisify(scryptCb) as (pw: string, salt: Buffer, len: number) => Promise<Buffer>;
 const COOKIE = "softilo_session";
 const SESSION_DAYS = 14;
+
+// Failed sign-ins per email and per address, and new companies per address.
+const loginFailures = new RateLimiter(10, 15 * 60_000);
+const ipFailures = new RateLimiter(50, 15 * 60_000);
+const signups = new RateLimiter(process.env.NODE_ENV === "test" ? Number.MAX_SAFE_INTEGER : 20, 60 * 60_000);
+
+function refuseIfLimited(reply: import("fastify").FastifyReply, seconds: number) {
+  if (!seconds) return;
+  reply.header("retry-after", seconds);
+  throw new AppError(429, `Too many attempts. Try again in ${Math.ceil(seconds / 60)} minutes.`, "rate_limited");
+}
 
 export async function hashPassword(password: string): Promise<string> {
   const salt = randomBytes(16);
@@ -77,10 +90,13 @@ export async function createTenantWithOwner(app: FastifyInstance, input: z.infer
 async function startSession(app: FastifyInstance, req: FastifyRequest, userId: string, tenantId: string) {
   const token = randomBytes(32).toString("base64url");
   const expires = new Date(Date.now() + SESSION_DAYS * 86_400_000);
-  await app.db.system((tx) => tx.query(
-    "INSERT INTO sessions (id, user_id, tenant_id, ip, user_agent, expires_at) VALUES ($1,$2,$3,$4,$5,$6)",
-    [sha256(token), userId, tenantId, req.ip, req.headers["user-agent"] ?? null, expires.toISOString()],
-  ));
+  await app.db.system(async (tx) => {
+    await tx.query("DELETE FROM sessions WHERE user_id = $1 AND expires_at <= now()", [userId]);
+    await tx.query(
+      "INSERT INTO sessions (id, user_id, tenant_id, ip, user_agent, expires_at) VALUES ($1,$2,$3,$4,$5,$6)",
+      [sha256(token), userId, tenantId, req.ip, req.headers["user-agent"] ?? null, expires.toISOString()],
+    );
+  });
   return { token, expires };
 }
 
@@ -112,7 +128,9 @@ export async function registerAuth(app: FastifyInstance) {
   });
 
   app.post("/api/auth/signup", async (req, reply) => {
+    refuseIfLimited(reply, signups.retryAfter(req.ip));
     const input = SignUp.parse(req.body);
+    signups.hit(req.ip);
     const { tenantId, userId } = await createTenantWithOwner(app, input);
     const { token, expires } = await startSession(app, req, userId, tenantId);
     setCookie(reply, token, expires);
@@ -121,6 +139,7 @@ export async function registerAuth(app: FastifyInstance) {
 
   app.post("/api/auth/login", async (req, reply) => {
     const input = SignIn.parse(req.body);
+    refuseIfLimited(reply, Math.max(loginFailures.retryAfter(input.email), ipFailures.retryAfter(req.ip)));
     const [u] = await app.db.query<{ id: string; password_hash: string; tenant_id: string | null }>(
       `SELECT u.id, u.password_hash,
               (SELECT tenant_id FROM memberships m WHERE m.user_id = u.id ORDER BY created_at LIMIT 1) AS tenant_id
@@ -129,10 +148,22 @@ export async function registerAuth(app: FastifyInstance) {
     );
     // Same response and similar timing whether or not the email exists.
     const ok = await verifyPassword(input.password, u?.password_hash ?? "scrypt$AAAAAAAAAAAAAAAAAAAAAA==$" + "A".repeat(86) + "==");
-    if (!u || !ok || !u.tenant_id) throw new AppError(401, "Email or password is incorrect", "invalid_credentials");
+    if (!u || !ok || !u.tenant_id) {
+      loginFailures.hit(input.email);
+      ipFailures.hit(req.ip);
+      throw new AppError(401, "Email or password is incorrect", "invalid_credentials");
+    }
+    loginFailures.clear(input.email);
     const { token, expires } = await startSession(app, req, u.id, u.tenant_id);
     setCookie(reply, token, expires);
     return { ok: true };
+  });
+
+  // What the login page needs to offer the sample company.
+  app.get("/api/auth/demo", async () => {
+    if (!demoEnabled()) return { available: false };
+    const [u] = await app.db.query("SELECT 1 FROM users WHERE email = $1", [DEMO_EMAIL]);
+    return u ? { available: true, email: DEMO_EMAIL, password: DEMO_PASSWORD, company: DEMO_COMPANY } : { available: false };
   });
 
   app.post("/api/auth/logout", async (req, reply) => {

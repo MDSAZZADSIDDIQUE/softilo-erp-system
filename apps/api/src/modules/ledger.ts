@@ -277,7 +277,7 @@ export async function registerLedger(app: FastifyInstance) {
         WHERE p.track_stock AND NOT p.archived AND p.reorder_level IS NOT NULL
         GROUP BY p.id HAVING coalesce(sum(b.quantity), 0) <= p.reorder_level ORDER BY p.sku LIMIT 10`);
     const [unrec] = await tx.query<{ n: string }>("SELECT count(*) AS n FROM bank_transactions WHERE status = 'unreconciled'");
-    const recent = await tx.query("SELECT id, number, date, memo, source_type FROM journal_entries ORDER BY created_at DESC LIMIT 8");
+    const recent = await tx.query("SELECT id, number, date, memo, source_type FROM journal_entries ORDER BY date DESC, number DESC LIMIT 8");
     const vatOutput = await bal("vat_output", -1);
     const vatInput = await bal("vat_input");
     return {
