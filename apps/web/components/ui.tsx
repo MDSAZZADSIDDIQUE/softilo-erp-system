@@ -154,3 +154,8 @@ export function Tabs({ tabs, active, onChange }: { tabs: { id: string; label: st
     </div>
   );
 }
+
+/** The product's line-art scene, shown at the top of the dashboard. */
+export function ArtBand() {
+  return <div className="art-band" aria-hidden="true"><img className="scene-light" src="/art/scene.svg" alt="" width={1200} height={190} /><img className="scene-dark" src="/art/scene-dark.svg" alt="" width={1200} height={190} /></div>;
+}

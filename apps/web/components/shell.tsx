@@ -80,8 +80,8 @@ export function Shell({ children }: { children: React.ReactNode }) {
                 const active = isActive(pathname, kind, i.href);
                 return (
                   <Link key={i.href} href={i.href} className={`nav-link${active ? " active" : ""}`}>
-                    {/* The current page's icon is filled signal orange. */}
-                    <i.icon tint={active ? "var(--signal)" : "currentColor"} tintOpacity={active ? 0.9 : undefined} />
+                    {/* The current page's icon is filled. */}
+                    <i.icon tint={active ? "var(--nav-active-icon)" : "currentColor"} tintOpacity={active ? 0.9 : undefined} />
                     {i.label}
                   </Link>
                 );
