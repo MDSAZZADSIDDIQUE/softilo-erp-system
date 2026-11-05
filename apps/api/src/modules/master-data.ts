@@ -12,6 +12,15 @@ const Address = z.object({
   country: z.string().max(2).optional(),
 }).default({});
 
+/** Company settings also hold the bank details printed on invoices and reminders. */
+const CompanyAddress = z.object({
+  line1: z.string().max(200).optional(), line2: z.string().max(200).optional(),
+  city: z.string().max(100).optional(), postcode: z.string().max(10).optional(), country: z.string().max(2).optional(),
+  email: z.email().optional().or(z.literal("")), phone: z.string().max(40).optional(),
+  bankName: z.string().max(80).optional(), sortCode: z.string().regex(/^\d{2}-?\d{2}-?\d{2}$/, "Sort codes are six digits").optional().or(z.literal("")),
+  accountNumber: z.string().regex(/^\d{8}$/, "Account numbers are eight digits").optional().or(z.literal("")),
+});
+
 const Contact = z.object({
   kind: z.enum(["customer", "supplier", "both"]),
   name: z.string().trim().min(1).max(200),
@@ -22,6 +31,8 @@ const Contact = z.object({
   currency: currency.default("GBP"),
   paymentTermsDays: z.number().int().min(0).max(365).default(30),
   address: Address,
+  creditLimit: z.union([z.string(), z.number()]).transform(String).refine((v) => /^\d{1,13}(\.\d{1,2})?$/.test(v), "Must be an amount").optional().nullable(),
+  reminders: z.boolean().default(true),
 });
 
 const Product = z.object({
@@ -55,7 +66,7 @@ export async function registerMasterData(app: FastifyInstance) {
       vatNumber: z.string().trim().max(14).nullable().optional(),
       vatScheme: z.enum(["standard", "cash"]).optional(),
       lockDate: isoDate.nullable().optional(),
-      address: Address.optional(),
+      address: CompanyAddress.optional(),
     }).parse(req.body);
     const [cur] = await tx.query<{ lock_date: string | null }>("SELECT lock_date FROM tenants");
     // Only owners can move the lock date backwards (re-opening a closed period).
@@ -103,10 +114,10 @@ export async function registerMasterData(app: FastifyInstance) {
     const c = Contact.parse(req.body);
     const id = newId();
     await tx.query(
-      `INSERT INTO contacts (id, tenant_id, kind, name, email, phone, company_number, vat_number, currency, payment_terms_days, address)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)`,
+      `INSERT INTO contacts (id, tenant_id, kind, name, email, phone, company_number, vat_number, currency, payment_terms_days, address, credit_limit, reminders)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)`,
       [id, ctx.tenantId, c.kind, c.name, c.email || null, c.phone ?? null, c.companyNumber || null,
-        c.vatNumber?.replace(/^GB/i, "") || null, c.currency, c.paymentTermsDays, JSON.stringify(c.address)],
+        c.vatNumber?.replace(/^GB/i, "") || null, c.currency, c.paymentTermsDays, JSON.stringify(c.address), c.creditLimit ?? null, c.reminders],
     );
     await audit(tx, ctx, "contact.created", "contact", id, c);
     return reply.status(201).send({ id });
@@ -120,11 +131,13 @@ export async function registerMasterData(app: FastifyInstance) {
       `UPDATE contacts SET kind = coalesce($2, kind), name = coalesce($3, name), email = coalesce($4, email),
          phone = coalesce($5, phone), company_number = coalesce($6, company_number), vat_number = coalesce($7, vat_number),
          currency = coalesce($8, currency), payment_terms_days = coalesce($9, payment_terms_days),
-         address = coalesce($10::jsonb, address), archived = coalesce($11, archived)
+         address = coalesce($10::jsonb, address), archived = coalesce($11, archived),
+         credit_limit = CASE WHEN $12::boolean THEN $13::numeric ELSE credit_limit END, reminders = coalesce($14, reminders)
        WHERE id = $1 RETURNING id`,
       [id, c.kind ?? null, c.name ?? null, c.email ?? null, c.phone ?? null, c.companyNumber ?? null,
         c.vatNumber ?? null, c.currency ?? null, c.paymentTermsDays ?? null,
-        c.address ? JSON.stringify(c.address) : null, c.archived ?? null],
+        c.address ? JSON.stringify(c.address) : null, c.archived ?? null,
+        "creditLimit" in (req.body as object), c.creditLimit ?? null, "reminders" in (req.body as object) ? c.reminders : null],
     );
     if (!rows.length) throw notFound("Contact");
     await audit(tx, ctx, "contact.updated", "contact", id, c);

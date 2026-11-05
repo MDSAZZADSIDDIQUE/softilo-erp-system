@@ -36,7 +36,7 @@ const ReceiveInput = z.object({
   lines: z.array(z.object({ poLineId: uuid, quantity })).min(1),
 });
 
-const BillInput = z.object({
+export const BillInput = z.object({
   kind: z.enum(["bill", "credit"]).default("bill"),
   supplierId: uuid,
   supplierRef: z.string().trim().min(1).max(60),

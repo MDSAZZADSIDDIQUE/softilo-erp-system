@@ -1,4 +1,5 @@
 import type { Database } from "@softilo/db";
+import { createProviders, type Providers } from "./integrations/index.js";
 import Fastify, { type FastifyServerOptions } from "fastify";
 import { registerErrorHandler } from "./lib/errors.js";
 import { registerAuth } from "./modules/auth.js";
@@ -8,10 +9,18 @@ import { registerMasterData } from "./modules/master-data.js";
 import { registerPurchasing } from "./modules/purchasing.js";
 import { registerSales } from "./modules/sales.js";
 import { registerVat } from "./modules/vat.js";
+import { registerAnalytics } from "./modules/analytics.js";
+import { registerAssistant } from "./modules/assistant.js";
+import { registerAutomations } from "./modules/automations.js";
+import { registerDocuments } from "./modules/documents.js";
+import { registerIntegrations } from "./modules/integrations.js";
+import { registerTeam } from "./modules/team.js";
 
-export async function buildServer(db: Database, opts: FastifyServerOptions = {}) {
-  const app = Fastify({ bodyLimit: 6 * 1024 * 1024, trustProxy: true, ...opts });
+export async function buildServer(db: Database, opts: FastifyServerOptions & { providers?: Providers } = {}) {
+  const { providers = createProviders(), ...fastifyOpts } = opts;
+  const app = Fastify({ bodyLimit: 6 * 1024 * 1024, trustProxy: true, ...fastifyOpts });
   app.decorate("db", db);
+  app.decorate("providers", providers);
   registerErrorHandler(app);
   app.get("/api/health", async () => ({ ok: true }));
   await registerAuth(app);
@@ -21,5 +30,11 @@ export async function buildServer(db: Database, opts: FastifyServerOptions = {})
   await registerBanking(app);
   await registerVat(app);
   await registerLedger(app);
+  await registerIntegrations(app);
+  await registerAutomations(app);
+  await registerDocuments(app);
+  await registerAnalytics(app);
+  await registerAssistant(app);
+  await registerTeam(app);
   return app;
 }

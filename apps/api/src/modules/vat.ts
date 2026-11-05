@@ -1,11 +1,13 @@
 import { newId, type Sql } from "@softilo/db";
-import { buildVatReturn, d, postPva, postVatSettlement, round2, type VatCode } from "@softilo/domain";
+import { buildVatReturn, d, postPva, postVatSettlement, round2, type VatCode, type VatReturn } from "@softilo/domain";
+import type { FraudPreventionData } from "../integrations/index.js";
+import { hmrcAuth } from "../lib/connections.js";
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import { inTenant, requireWrite } from "../lib/context.js";
-import { AppError, notFound, unprocessable } from "../lib/errors.js";
+import { notFound, unprocessable } from "../lib/errors.js";
 import { audit, loadRoles, postJournal } from "../lib/ledger.js";
-import { IdParams, isoDate, money, uuid } from "../lib/schemas.js";
+import { addDays, IdParams, isoDate, money, today, uuid } from "../lib/schemas.js";
 
 const Period = z.object({ from: isoDate, to: isoDate }).refine((p) => p.from <= p.to, "from must be on or before to");
 
@@ -66,11 +68,56 @@ export async function registerVat(app: FastifyInstance) {
     return { ...r, byCode };
   }));
 
-  app.post("/api/vat/returns/:id/submit", async () => {
-    throw new AppError(501,
-      "Submitting to HMRC needs the MTD VAT connection (HMRC Developer Hub credentials and fraud-prevention headers), which is not built yet.",
-      "not_implemented");
-  });
+  /** Obligations HMRC holds for the company: which periods are open and when each is due. */
+  app.get("/api/vat/obligations", (req) => inTenant(req, async (tx) => {
+    const q = z.object({ from: isoDate.optional(), to: isoDate.optional() }).parse(req.query);
+    const auth = await hmrcAuth(tx, app.providers);
+    const from = q.from ?? auth.firstPeriodStart ?? today();
+    const to = q.to ?? addDays(today(), 120);
+    const obligations = await app.providers.hmrc.obligations(auth, from, to);
+    const local = await tx.query<{ id: string; period_key: string; status: string }>("SELECT id, period_key, status FROM vat_returns");
+    return obligations.map((o) => {
+      const r = local.find((l) => l.period_key === o.periodKey);
+      return { ...o, returnId: r?.id ?? null, returnStatus: r?.status ?? null };
+    });
+  }));
+
+  /**
+   * Submit a finalised return to HMRC under Making Tax Digital. The figures sent are exactly the boxes stored
+   * when it was finalised; the receipt HMRC returns is kept with the return and in the audit trail.
+   */
+  app.post("/api/vat/returns/:id/submit", (req) => inTenant(req, async (tx, ctx) => {
+    requireWrite(ctx, "finance");
+    const { id } = IdParams.parse(req.params);
+    const body = z.object({
+      declaration: z.literal(true, { message: "The person submitting must confirm the declaration" }),
+      fraud: z.object({
+        deviceId: z.string().max(100).optional(), timezone: z.string().max(20).optional(), screens: z.string().max(200).optional(),
+        windowSize: z.string().max(60).optional(), userAgent: z.string().max(500).optional(), doNotTrack: z.string().max(10).optional(),
+      }).default({}),
+    }).parse(req.body);
+    const [r] = await tx.query<{ period_key: string; status: string; boxes: VatReturn }>("SELECT period_key, status, boxes FROM vat_returns WHERE id = $1 FOR UPDATE", [id]);
+    if (!r) throw notFound("VAT return");
+    if (r.status === "submitted") throw unprocessable("This return has already been submitted to HMRC");
+    const auth = await hmrcAuth(tx, app.providers);
+    const open = await app.providers.hmrc.obligations(auth, addDays(today(), -800), addDays(today(), 200));
+    const obligation = open.find((o) => o.periodKey === r.period_key);
+    if (!obligation) throw unprocessable(`HMRC has no obligation with period key ${r.period_key}. Check the period key on the return.`);
+    if (obligation.status === "F") throw unprocessable(`HMRC already holds a return for ${r.period_key}`);
+    const [mfa] = await tx.query<{ enabled: boolean }>("SELECT enabled_at IS NOT NULL AS enabled FROM user_mfa WHERE user_id = $1", [ctx.userId]);
+    const fraud: FraudPreventionData = {
+      clientPublicIp: req.ip, clientPublicPort: String(req.socket.remotePort ?? ""), clientDeviceId: body.fraud.deviceId,
+      clientUserIds: { softilo: ctx.userId ?? "automation" }, clientTimezone: body.fraud.timezone, clientScreens: body.fraud.screens,
+      clientWindowSize: body.fraud.windowSize, clientBrowserJsUserAgent: body.fraud.userAgent, clientBrowserDoNotTrack: body.fraud.doNotTrack,
+      clientMultiFactor: mfa?.enabled ? `type=TOTP&timestamp=${encodeURIComponent(new Date().toISOString())}&unique-reference=${ctx.userId}` : undefined,
+    };
+    const receipt = await app.providers.hmrc.submit(auth, r.period_key, r.boxes, fraud);
+    const mode = app.providers.hmrc.info().mode;
+    await tx.query("UPDATE vat_returns SET status = 'submitted', hmrc_receipt = $2, submitted_at = now(), submission_mode = $3 WHERE id = $1",
+      [id, JSON.stringify(receipt), mode]);
+    await audit(tx, ctx, "vat_return.submitted", "vat_return", id, { periodKey: r.period_key, mode, receipt });
+    return { ok: true, receipt, mode };
+  }));
 
   // ---------------------------------------------------------------- postponed VAT accounting
   app.get("/api/vat/pva", (req) => inTenant(req, (tx) => tx.query(

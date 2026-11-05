@@ -1,11 +1,13 @@
 import type { Database, Sql } from "@softilo/db";
+import type { Providers } from "../integrations/index.js";
 import type { FastifyReply, FastifyRequest } from "fastify";
 import { AppError, forbidden } from "./errors.js";
 
 export type Role = "owner" | "admin" | "finance" | "operations" | "accountant" | "viewer";
 
 export interface Ctx {
-  userId: string;
+  /** null when an automation acts on its own (scheduled runs). */
+  userId: string | null;
   tenantId: string;
   role: Role;
   ip?: string;
@@ -14,6 +16,7 @@ export interface Ctx {
 declare module "fastify" {
   interface FastifyInstance {
     db: Database;
+    providers: Providers;
   }
   interface FastifyRequest {
     ctx?: Ctx;
@@ -26,6 +29,11 @@ const WRITE: Record<string, Role[]> = {
   operations: ["owner", "admin", "finance", "operations"],
   settings: ["owner", "admin"],
 };
+
+/** The context automations run under: no user, owner-level rights, recorded as "automation" in the audit trail. */
+export function automationCtx(tenantId: string): Ctx {
+  return { userId: null, tenantId, role: "owner", ip: "automation" };
+}
 
 export function requireCtx(req: FastifyRequest): Ctx {
   if (!req.ctx) throw new AppError(401, "Please sign in", "unauthenticated");

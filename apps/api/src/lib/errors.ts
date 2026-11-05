@@ -40,6 +40,11 @@ export function registerErrorHandler(app: FastifyInstance) {
       return reply.status(422).send({ error: "unprocessable", message: friendlyDbMessage(pgCode, err.message) });
     }
     const status = (err as FastifyError).statusCode;
+    // An outside service (HMRC, the bank, the AI model) failed or is not configured: say which, not "something went wrong".
+    if (status === 502 || status === 503) {
+      req.log.warn(err);
+      return reply.status(status).send({ error: status === 502 ? "upstream" : "not_configured", message: err.message });
+    }
     if (status && status < 500) return reply.status(status).send({ error: "bad_request", message: err.message });
     req.log.error(err);
     return reply.status(500).send({ error: "internal", message: "Something went wrong" });
