@@ -64,7 +64,11 @@ export async function hmrcAuth(tx: Sql, providers: Providers): Promise<HmrcAuth>
 export async function demoBankSeed(tx: Sql, ctx: Ctx, accountCode: string): Promise<DemoBankSeed> {
   const payments = await tx.query<DemoBankSeed["payments"][number]>(
     `SELECT p.id, p.date::text, round(p.amount * p.rate, 2)::text AS gbp, p.direction, p.reference, c.name AS contact, p.currency, p.amount::text
-       FROM payments p JOIN contacts c ON c.id = p.contact_id WHERE p.bank_account_code = $1 ORDER BY p.date`, [accountCode]);
+       FROM payments p JOIN contacts c ON c.id = p.contact_id
+      WHERE p.bank_account_code = $1
+        -- Already on a statement imported by hand: the bank reports each transaction once.
+        AND NOT EXISTS (SELECT 1 FROM bank_transactions b WHERE b.payment_id = p.id AND b.source = 'csv')
+      ORDER BY p.date`, [accountCode]);
   const returns = await tx.query<{ period_key: string; start_date: string; end_date: string; boxes: { box3: string; box4: string; box5: string } }>(
     "SELECT period_key, start_date::text, end_date::text, boxes FROM vat_returns ORDER BY end_date");
   const first = returns[0]?.start_date;

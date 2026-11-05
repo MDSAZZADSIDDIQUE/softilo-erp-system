@@ -4,16 +4,21 @@ import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useState } from "react";
 import { api, useApi } from "@/lib/api";
-import { AccountsIcon, AuditIcon, BankIcon, BanknoteIcon, BoxIcon, ClipboardIcon, CustomersIcon, DashboardIcon, InvoiceIcon, JournalIcon, MenuIcon, PercentIcon, ReceiptIcon, ReportsIcon, SettingsIcon, ShipIcon, SignOutIcon, WarehouseIcon, type SoftiloIcon } from "@/components/softilo-icons";
+import { AccountsIcon, AuditIcon, BankIcon, BanknoteIcon, BoxIcon, ClipboardIcon, CustomersIcon, DashboardIcon, GearIcon, InboxIcon, InvoiceIcon, JournalIcon, MenuIcon, PercentIcon, ReceiptIcon, ReportsIcon, SettingsIcon, ShieldCheckIcon, ShipIcon, SignOutIcon, TransferIcon, TrendUpIcon, TriangleNodesIcon, WarehouseIcon, type SoftiloIcon } from "@/components/softilo-icons";
 
 const NAV: { group: string; items: { href: string; label: string; icon: SoftiloIcon }[] }[] = [
-  { group: "Overview", items: [{ href: "/", label: "Dashboard", icon: DashboardIcon }] },
+  { group: "Overview", items: [
+    { href: "/", label: "Dashboard", icon: DashboardIcon },
+    { href: "/insights", label: "Insights", icon: TrendUpIcon },
+    { href: "/assistant", label: "Ask Softilo", icon: TriangleNodesIcon },
+  ] },
   { group: "Sales", items: [
     { href: "/invoices", label: "Invoices & credits", icon: InvoiceIcon },
     { href: "/contacts?kind=customer", label: "Customers", icon: CustomersIcon },
   ] },
   { group: "Purchasing", items: [
     { href: "/purchase-orders", label: "Purchase orders", icon: ClipboardIcon },
+    { href: "/inbox", label: "Document inbox", icon: InboxIcon },
     { href: "/bills", label: "Supplier bills", icon: ReceiptIcon },
     { href: "/shipments", label: "Shipments & landed cost", icon: ShipIcon },
     { href: "/contacts?kind=supplier", label: "Suppliers", icon: WarehouseIcon },
@@ -33,6 +38,9 @@ const NAV: { group: string; items: { href: string; label: string; icon: SoftiloI
   ] },
   { group: "Company", items: [
     { href: "/settings", label: "Settings", icon: SettingsIcon },
+    { href: "/team", label: "Team and security", icon: ShieldCheckIcon },
+    { href: "/automations", label: "Automations", icon: GearIcon },
+    { href: "/connections", label: "Connections", icon: TransferIcon },
     { href: "/audit", label: "Audit trail", icon: AuditIcon },
   ] },
 ];

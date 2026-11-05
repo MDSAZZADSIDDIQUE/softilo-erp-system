@@ -171,8 +171,15 @@ export async function registerAuth(app: FastifyInstance) {
     return mfa ? { ok: true, mfaRequired: true } : { ok: true };
   });
 
+  /** Everyone shares the demo sign-in, so nobody may change its password or add a second factor to it. */
+  async function refuseForDemoUser(userId: string | null) {
+    const [u] = await app.db.query<{ email: string }>("SELECT email FROM users WHERE id = $1", [userId]);
+    if (u?.email === DEMO_EMAIL) throw new AppError(403, "The demo account's password and sign-in are shared by everyone trying Softilo, so they cannot be changed. Sign up your own company to try this.", "forbidden");
+  }
+
   app.post("/api/auth/password", async (req) => {
     const ctx = requireCtx(req);
+    await refuseForDemoUser(ctx.userId);
     const input = z.object({ current: z.string().min(1), next: z.string().min(12, "Use at least 12 characters").max(200) }).parse(req.body);
     const [u] = await app.db.query<{ password_hash: string }>("SELECT password_hash FROM users WHERE id = $1", [ctx.userId]);
     if (!u || !(await verifyPassword(input.current, u.password_hash))) throw new AppError(422, "Your current password is not right", "invalid_credentials");
@@ -233,6 +240,7 @@ export async function registerAuth(app: FastifyInstance) {
   /** Start set-up: a new secret the user scans into their authenticator app. Not active until confirmed with a code. */
   app.post("/api/auth/mfa/setup", async (req) => {
     const ctx = requireCtx(req);
+    await refuseForDemoUser(ctx.userId);
     const [u] = await app.db.query<{ email: string; enabled_at: string | null }>(
       "SELECT u.email, m.enabled_at FROM users u LEFT JOIN user_mfa m ON m.user_id = u.id WHERE u.id = $1", [ctx.userId]);
     if (u?.enabled_at) throw new AppError(409, "Two-factor sign-in is already on. Turn it off first to set up a new device.", "conflict");

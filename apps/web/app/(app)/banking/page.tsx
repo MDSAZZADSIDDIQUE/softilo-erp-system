@@ -7,7 +7,8 @@ import { api, useApi } from "@/lib/api";
 import { date, money } from "@/lib/format";
 
 interface BankAccount { code: string; name: string; balance: string; unreconciled: string; statement_balance: string }
-interface Txn { id: string; date: string; description: string; reference: string | null; amount: string; status: string; payment_number: string | null; journal_number: string | null }
+interface Txn { id: string; date: string; description: string; reference: string | null; amount: string; status: string; payment_number: string | null; journal_number: string | null; source: string; matched_by: string | null }
+interface Feeds { connections: { id: string; provider: string; status: string; account_code: string | null; label: string | null; last_synced_at: string | null; mode: string }[] }
 interface Suggestions {
   payments: { id: string; number: string; date: string; amount: string; contact_name: string }[];
   documents: { id: string; number: string; date: string; outstanding: string; contact_id: string; contact_name: string; type: string }[];
@@ -70,6 +71,28 @@ export default function BankingPage() {
   const [importMsg, setImportMsg] = useState<string>();
   const [importError, setImportError] = useState<string>();
   const current = accounts?.find((a) => a.code === code);
+  const { data: feeds, reload: reloadFeeds } = useApi<Feeds>("/api/integrations");
+  const feed = feeds?.connections.find((c) => c.provider === "bank_feed" && c.status === "connected" && c.account_code === code);
+  const [syncing, setSyncing] = useState(false);
+
+  async function fetchFromBank() {
+    setSyncing(true);
+    setImportError(undefined);
+    try {
+      if (!feed) {
+        const r = await api<{ redirect?: string }>("/api/integrations/bank/connect", { body: { bankAccountCode: code } });
+        if (r.redirect) { window.location.href = r.redirect; return; }
+      }
+      const s = await api<{ added: number }>("/api/integrations/bank/sync", { body: { bankAccountCode: code } });
+      const m = await api<{ actions: unknown[] }>("/api/automations/bank_matching/run", { body: {} });
+      setImportMsg(`Fetched ${s.added} new line${s.added === 1 ? "" : "s"} from the bank. ${m.actions.length} reconciled automatically by matching and your bank rules; the rest are below.`);
+      await Promise.all([reload(), reloadAccounts(), reloadFeeds()]);
+    } catch (e) {
+      setImportError((e as Error).message);
+    } finally {
+      setSyncing(false);
+    }
+  }
 
   async function importFile(file: File) {
     setImportError(undefined);
@@ -86,11 +109,14 @@ export default function BankingPage() {
 
   return (
     <div className="stack">
-      <PageHeader title="Bank reconciliation" subtitle="Import your statement, then match each line to a payment or code it to an account.">
+      <PageHeader title="Bank reconciliation" subtitle={feed
+        ? `Bank feed connected (${feed.label}${feed.mode === "demo" ? ", demo" : ""}). Last fetched ${feed.last_synced_at ? new Date(feed.last_synced_at).toLocaleString("en-GB", { dateStyle: "medium", timeStyle: "short" }) : "never"}; Softilo also fetches every hour.`
+        : "Connect the bank feed, or import a statement, then match each line to a payment or code it to an account."}>
         <select value={code} onChange={(e) => setCode(e.target.value)} aria-label="Bank account" style={{ width: "auto" }}>
           {accounts?.map((a) => <option key={a.code} value={a.code}>{a.code} · {a.name}</option>)}
         </select>
-        <label className="btn primary">
+        <button className="btn primary" disabled={syncing} onClick={() => void fetchFromBank()}>{syncing ? "Fetching…" : feed ? "Fetch from bank" : "Connect bank feed"}</button>
+        <label className="btn">
           Import statement (CSV)
           <input type="file" accept=".csv,text/csv" hidden onChange={(e) => { const f = e.target.files?.[0]; if (f) void importFile(f); e.target.value = ""; }} />
         </label>
@@ -123,7 +149,7 @@ export default function BankingPage() {
                       <td>{date(t.date)}</td><td>{t.description}</td><td>{t.reference ?? <span className="faint">–</span>}</td>
                       <td className="num">{Number(t.amount) > 0 ? money(t.amount) : ""}</td>
                       <td className="num">{Number(t.amount) < 0 ? money(-Number(t.amount)) : ""}</td>
-                      <td><Status value={t.status} /> {t.payment_number ?? t.journal_number ? <span className="faint">{t.payment_number ?? t.journal_number}</span> : null}</td>
+                      <td><Status value={t.status} /> {t.payment_number ?? t.journal_number ? <span className="faint">{t.payment_number ?? t.journal_number}</span> : null}{t.matched_by && t.matched_by !== "user" ? <small className="faint"> · by {t.matched_by === "rule" ? "bank rule" : "automation"}</small> : null}{t.source === "feed" && t.status === "unreconciled" ? <small className="faint"> · from feed</small> : null}</td>
                       <td className="num">{t.status === "unreconciled" && <button className="btn small" onClick={() => setOpen(open === t.id ? undefined : t.id)}>{open === t.id ? "Close" : "Reconcile"}</button>}</td>
                     </tr>
                     {open === t.id && <tr><td colSpan={7} style={{ padding: 0 }}><Reconcile txn={t} onDone={done} /></td></tr>}

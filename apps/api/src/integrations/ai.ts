@@ -61,7 +61,8 @@ export const EXTRACTION_JSON_SCHEMA = {
 
 const money2 = (s: string | undefined | null) => {
   if (!s) return null;
-  const n = Number(s.replace(/[£$€¥,\s]/g, "").replace(/^\((.*)\)$/, "-$1"));
+  // "USD 18,534.00", "£1,320.00", "(45.00)": drop currency codes and symbols, brackets mean negative.
+  const n = Number(s.replace(/\b[A-Z]{3}\b|[£$€¥,\s]/g, "").replace(/^\((.*)\)$/, "-$1"));
   return Number.isFinite(n) ? n.toFixed(2) : null;
 };
 
@@ -189,7 +190,8 @@ List anything a bookkeeper should check in notes (totals that do not add up, a m
 const ASK_PROMPT = (company: string, today: string) => `You are the analyst inside Softilo ERP for ${company}, a UK importer and wholesaler. Today is ${today}.
 Answer the user's question using only figures returned by the tools. Call the tools you need; never invent numbers.
 Amounts are in pounds sterling unless a currency is named. Be brief and specific: lead with the answer, then the two or three figures that support it, and say what to do next if there is an obvious action.
-You can only read data. If the user asks you to post, pay, send or change anything, tell them which screen does it.`;
+You can only read data. If the user asks you to post, pay, send or change anything, tell them which screen does it.
+Write plain sentences. Short lists may start each line with "- ". Do not use Markdown headings, bold or tables. Write dates like 28 January 2027.`;
 
 export function geminiAi(env: NodeJS.ProcessEnv = process.env): AiProvider {
   const apiKey = env.GEMINI_API_KEY;

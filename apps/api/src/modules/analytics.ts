@@ -7,6 +7,11 @@ import { addDays, isoDate, today } from "../lib/schemas.js";
 
 type Providers = FastifyInstance["providers"];
 const n = (v: unknown) => Number(v ?? 0);
+const addMonths = (date: string, months: number) => {
+  const x = new Date(`${date}T00:00:00Z`);
+  x.setUTCMonth(x.getUTCMonth() + months);
+  return x.toISOString().slice(0, 10);
+};
 const r2 = (v: number) => Math.round(v * 100) / 100;
 
 // ---------------------------------------------------------------- margin
@@ -96,11 +101,6 @@ export async function cashForecast(tx: Sql, weeks = 13) {
             (SELECT max(end_date)::text FROM vat_returns) AS last_end
        FROM vat_entries WHERE vat_return_id IS NULL`);
   const [vatLiab] = await tx.query<{ v: string }>("SELECT coalesce(sum(credit - debit), 0) AS v FROM journal_lines l JOIN accounts a ON a.code = l.account_code WHERE a.role = 'vat_control'");
-  const addMonths = (date: string, months: number) => {
-    const x = new Date(`${date}T00:00:00Z`);
-    x.setUTCMonth(x.getUTCMonth() + months);
-    return x.toISOString().slice(0, 10);
-  };
   const due = (endDate: string) => addDays(addMonths(addDays(endDate, 1), 1), 6);
   if (vat?.last_end) {
     // A finalised return not yet paid (VAT liability account still in credit).
@@ -125,6 +125,22 @@ export async function cashForecast(tx: Sql, weeks = 13) {
       x.setUTCDate(Math.min(n(rg.dom), 28));
       const date = x.toISOString().slice(0, 10);
       if (date >= start && date <= end) flows.push({ date, amount: -n(rg.avg), kind: "regular", label: `${rg.memo} (average of last 3 months)` });
+    }
+  }
+
+  // Suppliers who bill every month for overheads (rent, power): next months' bills, not yet received, at the average amount.
+  const recurring = await tx.query<{ name: string; dom: string; terms: number; avg: string; last: string }>(
+    `SELECT c.name, round(avg(extract(day FROM b.date)))::text AS dom, c.payment_terms_days AS terms,
+            round(avg(b.total * b.rate), 2)::text AS avg, max(b.date)::text AS last
+       FROM supplier_bills b JOIN contacts c ON c.id = b.supplier_id
+      WHERE b.kind = 'bill' AND b.date >= current_date - 125
+        AND NOT EXISTS (SELECT 1 FROM supplier_bill_lines l WHERE l.bill_id = b.id AND (l.kind = 'receipt' OR l.account_code = '2110'))
+      GROUP BY c.id HAVING count(DISTINCT date_trunc('month', b.date)) >= 3`);
+  for (const rb of recurring) {
+    for (let m = 1; m <= 4; m++) {
+      const billDate = addMonths(`${rb.last.slice(0, 8)}${String(Math.min(n(rb.dom), 28)).padStart(2, "0")}`, m);
+      const date = addDays(billDate, rb.terms);
+      if (date >= start && date <= end) flows.push({ date, amount: -n(rb.avg), kind: "regular", label: `${rb.name}, monthly bill expected ${billDate}` });
     }
   }
 
@@ -308,7 +324,7 @@ export async function anomalies(tx: Sql): Promise<Anomaly[]> {
        FROM contacts c JOIN sales_invoices i ON i.customer_id = c.id WHERE c.credit_limit IS NOT NULL
       GROUP BY c.id HAVING sum(round((i.total - i.amount_paid) * i.rate, 2) * CASE WHEN i.kind = 'invoice' THEN 1 ELSE -1 END) > c.credit_limit`)) {
     out.push({ severity: "high", kind: "credit_limit", title: `${r.name} is over its credit limit`,
-      detail: `Owes ${money(r.owed)} against a limit of ${money(r.credit_limit)}. Consider holding new orders.`, href: `/contacts/${r.id}` });
+      detail: `Owes ${money(r.owed)} against a limit of ${money(r.credit_limit)}. Consider holding new orders.`, href: "/contacts?kind=customer" });
   }
   for (const r of await tx.query<{ id: string; number: string; name: string; vat: string }>(
     `SELECT b.id, b.number, c.name, sum(l.vat) AS vat FROM supplier_bills b JOIN contacts c ON c.id = b.supplier_id JOIN supplier_bill_lines l ON l.bill_id = b.id

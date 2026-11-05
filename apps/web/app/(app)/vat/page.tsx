@@ -7,7 +7,53 @@ import { date, money, today } from "@/lib/format";
 
 interface Boxes { box1: string; box2: string; box3: string; box4: string; box5: string; box6: string; box7: string; box8: string; box9: string }
 interface Preview { from: string; to: string; boxes: Boxes; entries: number; lateEntries: number; byCode: { direction: string; vat_code: string; entries: string; net: string; vat: string }[] }
-interface VatReturn { id: string; period_key: string; start_date: string; end_date: string; boxes: Boxes; status: string; journal_number: string; created_at: string }
+interface VatReturn { id: string; period_key: string; start_date: string; end_date: string; boxes: Boxes; status: string; journal_number: string; created_at: string;
+  submitted_at: string | null; submission_mode: string | null; hmrc_receipt: { formBundleNumber: string; chargeRefNumber?: string; processingDate: string } | null }
+interface Obligation { periodKey: string; start: string; end: string; due: string; status: "O" | "F"; received?: string; returnId: string | null; returnStatus: string | null }
+
+/** What HMRC's fraud-prevention rules ask the browser for (Gov-Client-* headers). Sent with each submission. */
+function fraudData() {
+  let deviceId = "";
+  try {
+    deviceId = localStorage.getItem("softilo-device-id") ?? "";
+    if (!deviceId) { deviceId = crypto.randomUUID(); localStorage.setItem("softilo-device-id", deviceId); }
+  } catch { deviceId = crypto.randomUUID(); }
+  const offset = -new Date().getTimezoneOffset();
+  const tz = `UTC${offset >= 0 ? "+" : "-"}${String(Math.floor(Math.abs(offset) / 60)).padStart(2, "0")}:${String(Math.abs(offset) % 60).padStart(2, "0")}`;
+  return {
+    deviceId, timezone: tz, userAgent: navigator.userAgent, doNotTrack: navigator.doNotTrack === "1" ? "true" : "false",
+    screens: `width=${screen.width}&height=${screen.height}&scaling-factor=${window.devicePixelRatio}&colour-depth=${screen.colorDepth}`,
+    windowSize: `width=${window.innerWidth}&height=${window.innerHeight}`,
+  };
+}
+
+function Obligations({ onUse, reloadKey }: { onUse: (o: Obligation) => void; reloadKey: number }) {
+  const { data, error, reload } = useApi<Obligation[]>(`/api/vat/obligations?k=${reloadKey}`);
+  const [connectError, setConnectError] = useState<string>();
+  const notConnected = error && /Connect Softilo to HMRC/.test(error);
+  async function connect() {
+    try {
+      const r = await api<{ redirect?: string }>("/api/integrations/hmrc/connect", { body: {} });
+      if (r.redirect) window.location.href = r.redirect; else await reload();
+    } catch (e) { setConnectError((e as Error).message); }
+  }
+  return (
+    <Card title="HMRC obligations" actions={notConnected ? <button className="btn small primary" onClick={() => void connect()}>Connect to HMRC</button> : undefined}>
+      <ErrorBanner message={connectError ?? (notConnected ? undefined : error)} />
+      {notConnected ? <p className="muted card-pad" style={{ margin: 0 }}>Connect to HMRC to see which periods are due and to file returns under Making Tax Digital.</p> : (
+        <DataTable rows={data} columns={[
+          { key: "k", label: "Period", render: (o) => <span className="mono">{o.periodKey}</span> },
+          { key: "p", label: "Covers", render: (o) => `${date(o.start)} – ${date(o.end)}` },
+          { key: "d", label: "Due", render: (o) => <span className={o.status === "O" && o.due < today() ? "warn" : undefined}>{date(o.due)}</span> },
+          { key: "s", label: "HMRC", render: (o) => (o.status === "F" ? <span className="pill quiet ok">Filed{o.received ? ` ${date(o.received)}` : ""}</span> : <span className="pill">Open</span>) },
+          { key: "a", label: "", num: true, render: (o) => o.status === "O" && !o.returnId && o.end < today() ? <button className="btn small" onClick={() => onUse(o)}>Prepare</button>
+            : o.returnStatus === "finalised" ? <span className="muted">Finalised, ready to submit</span>
+            : o.status === "O" && o.end >= today() ? <span className="faint">Period not ended</span> : null },
+        ]} />
+      )}
+    </Card>
+  );
+}
 interface Pva { id: string; statement: string; mrn: string; date: string; value_gbp: string; vat_gbp: string; shipment_number: string | null }
 
 const BOX_LABELS: [keyof Boxes, string][] = [
@@ -59,6 +105,22 @@ export default function VatPage() {
   const { data: pva, reload: reloadPva } = useApi<Pva[]>("/api/vat/pva");
   const [msg, setMsg] = useState<string>();
   const [actionError, setActionError] = useState<string>();
+  const [periodKey, setPeriodKey] = useState("");
+  const [obligationsKey, setObligationsKey] = useState(0);
+
+  async function submit(r: VatReturn) {
+    const ok = confirm(`Submit the ${r.period_key} return to HMRC?\n\nDeclaration: When you submit this VAT information you are making a legal declaration that the information is true and complete. A false declaration can result in prosecution.\n\nBox 5: ${money(r.boxes.box5)}`);
+    if (!ok) return;
+    try {
+      const res = await api<{ receipt: { formBundleNumber: string; chargeRefNumber?: string }; mode: string }>(`/api/vat/returns/${r.id}/submit`, { body: { declaration: true, fraud: fraudData() } });
+      setMsg(`${r.period_key} submitted${res.mode === "demo" ? " to the HMRC simulator" : " to HMRC"}. Receipt ${res.receipt.formBundleNumber}${res.receipt.chargeRefNumber ? `, payment reference ${res.receipt.chargeRefNumber}` : ""}.`);
+      setActionError(undefined);
+      setObligationsKey((k) => k + 1);
+      await reloadReturns();
+    } catch (err) {
+      setActionError((err as Error).message);
+    }
+  }
 
   async function finalise(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -66,7 +128,8 @@ export default function VatPage() {
     if (!confirm(`Finalise this VAT return? Transactions up to ${date(period.to)} will be locked.`)) return;
     try {
       await api("/api/vat/returns", { body: { periodKey: f.periodKey, from: period.from, to: period.to, lockBooks: true } });
-      setMsg("Return finalised and the period locked. Submit it to HMRC once the MTD connection is set up.");
+      setMsg("Return finalised and the period locked. Submit it to HMRC from Past returns.");
+      setObligationsKey((k) => k + 1);
       setActionError(undefined);
       await Promise.all([reload(), reloadReturns()]);
     } catch (err) {
@@ -98,6 +161,7 @@ export default function VatPage() {
       <ErrorBanner message={actionError ?? error} />
       <Tabs active={tab} onChange={setTab} tabs={[{ id: "return", label: "Current return" }, { id: "history", label: "Past returns" }, { id: "pva", label: "Postponed import VAT" }]} />
 
+      {tab === "return" && <Obligations reloadKey={obligationsKey} onUse={(o) => { setPeriod({ from: o.start, to: o.end }); setPeriodKey(o.periodKey); }} />}
       {tab === "return" && (
         <div className="grid-main">
           <Card title="Return preview" actions={
@@ -115,9 +179,8 @@ export default function VatPage() {
                 {preview.entries} VAT transactions not yet on a return{preview.lateEntries ? `, including ${preview.lateEntries} dated before this period (they roll in here)` : ""}.
               </p>}
               <form onSubmit={finalise} className="stack" style={{ gap: 12 }}>
-                <Field label="HMRC period key" hint="From your VAT obligations, e.g. 26C3"><input name="periodKey" required maxLength={10} /></Field>
+                <Field label="HMRC period key" hint="Filled in when you prepare an obligation above"><input name="periodKey" required maxLength={10} value={periodKey} onChange={(e) => setPeriodKey(e.target.value)} /></Field>
                 <button className="btn primary" disabled={!preview?.entries}>Finalise and lock period</button>
-                <button type="button" className="btn" disabled title="Needs the HMRC MTD connection">Submit to HMRC</button>
               </form>
             </Card>
             <Card title="By VAT code">
@@ -142,6 +205,9 @@ export default function VatPage() {
             { key: "4", label: "Box 4", num: true, render: (r) => money(r.boxes.box4) },
             { key: "5", label: "Box 5", num: true, render: (r) => <strong style={{ fontWeight: 500 }}>{money(r.boxes.box5)}</strong> },
             { key: "j", label: "Journal", render: (r) => r.journal_number },
+            { key: "h", label: "HMRC", render: (r) => r.status === "submitted"
+              ? <span className="muted">{r.submission_mode === "demo" ? "Simulator" : "Filed"} {date(r.submitted_at)}<br /><small className="faint">Receipt {r.hmrc_receipt?.formBundleNumber}</small></span>
+              : <button className="btn small primary" onClick={() => void submit(r)}>Submit to HMRC</button> },
           ]} />
         </Card>
       )}

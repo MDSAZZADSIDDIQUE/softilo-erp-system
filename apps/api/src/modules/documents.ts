@@ -77,11 +77,17 @@ async function propose(tx: Sql, providers: Providers, x: ExtractedDocument): Pro
   // Freight and customs: costs to land against the shipment, through landed cost clearing.
   if (!lines.length) {
     const landed = x.docType === "freight_invoice" || x.docType === "customs_entry";
+    // Other bills go where this supplier's bills usually go (rent to rent, power to utilities).
+    const [usual] = sup && !landed ? await tx.query<{ account_code: string; name: string }>(
+      `SELECT l.account_code, a.name FROM supplier_bill_lines l JOIN supplier_bills b ON b.id = l.bill_id JOIN accounts a ON a.code = l.account_code
+        WHERE b.supplier_id = $1 AND l.kind = 'account' GROUP BY l.account_code, a.name ORDER BY count(*) DESC LIMIT 1`, [sup.id]) : [];
+    if (usual) matches.push(`Coded to ${usual.account_code} ${usual.name}, where ${sup!.name}'s bills usually go`);
     for (const l of x.lines.length ? x.lines : [{ description: x.docType.replace("_", " "), net: x.net ?? x.total ?? "0", vatRate: x.vat && Number(x.vat) > 0 ? "20" : "0", quantity: null, unitPrice: null, sku: null }]) {
       const isDuty = /duty|tariff/i.test(l.description);
       const rate = l.vatRate === null ? (x.vat && Number(x.vat) > 0 ? 20 : 0) : Number(l.vatRate);
-      const vatCode = isDuty ? "OS" : rate >= 19 ? "S20" : rate === 5 ? "R5" : cur === "GBP" && !landed ? "Z0" : "OS";
-      lines.push({ kind: "account", accountCode: landed ? "2110" : "5200", description: [l.description, x.containerRef, x.mrn].filter(Boolean).join(" "), net: l.net, vatCode });
+      // Duty is outside the scope of VAT; international freight is zero-rated; overseas suppliers charge no UK VAT.
+      const vatCode = isDuty || cur !== "GBP" ? "OS" : rate >= 19 ? "S20" : rate === 5 ? "R5" : "Z0";
+      lines.push({ kind: "account", accountCode: landed ? "2110" : usual?.account_code ?? "7500", description: [l.description, x.containerRef, x.mrn].filter(Boolean).join(" "), net: l.net, vatCode });
     }
     if (landed) matches.push("Coded to landed cost clearing (2110), ready to land on the shipment");
     if (x.containerRef || x.mrn) {

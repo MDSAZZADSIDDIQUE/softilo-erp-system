@@ -27,6 +27,18 @@ export default function InvoicePage() {
   const { data: inv, error, reload } = useApi<Invoice>(`/api/sales-invoices/${id}`);
   const { data: open } = useApi<{ id: string; number: string; kind: string; customer_id: string; outstanding: string }[]>("/api/sales-invoices");
   const [applyError, setApplyError] = useState<string>();
+  const { data: emails, reload: reloadEmails } = useApi<{ id: string; template: string; subject: string; status: string; mode: string; created_at: string; created_by: string }[]>(`/api/outbox?relatedId=${id}`);
+  const [emailMsg, setEmailMsg] = useState<string>();
+
+  async function emailInvoice() {
+    try {
+      const r = await api<{ status: string; error: string | null }>(`/api/sales-invoices/${id}/email`, { body: {} });
+      setEmailMsg(r.status === "sent" ? "Emailed to the customer. A copy is in Automations → Emails sent." : `Not sent: ${r.error}`);
+      await reloadEmails();
+    } catch (e) {
+      setEmailMsg((e as Error).message);
+    }
+  }
 
   if (!inv) return error ? <ErrorBanner message={error} /> : <div className="card"><Loading /></div>;
   const isCredit = inv.kind === "credit";
@@ -41,8 +53,15 @@ export default function InvoicePage() {
         <Link className="btn ghost no-print" href={`/journals/${inv.entry_id}`}>Journal {inv.journal_number}</Link>
         {!isCredit && <Link className="btn no-print" href={`/invoices/new?kind=credit&customerId=${inv.customer_id}`}>Credit</Link>}
         <button className="btn no-print" onClick={() => window.print()}>Print / PDF</button>
+        {!isCredit && <button className="btn no-print" onClick={() => void emailInvoice()}>Email</button>}
         {!isCredit && Number(inv.outstanding) > 0 && <Link className="btn primary no-print" href={`/payments/new?direction=receipt&contactId=${inv.customer_id}&documentId=${inv.id}`}>Record payment</Link>}
       </PageHeader>
+      {emailMsg && <div className="banner ok no-print">{emailMsg}</div>}
+      {emails && emails.length > 0 && (
+        <p className="muted no-print" style={{ margin: 0, fontSize: 13 }}>
+          Emails: {emails.map((m) => `${m.template === "invoice" ? "Invoice" : m.template.replace("reminder_", "Reminder ")} ${date(m.created_at)}${m.created_by === "automation" ? " (automatic)" : ""}`).join(" · ")}
+        </p>
+      )}
 
       {isCredit && Number(inv.outstanding) > 0 && applyTargets.length > 0 && (
         <Card title="Apply this credit" pad>

@@ -13,6 +13,22 @@ function LoginForm() {
   const next = useSearchParams().get("next") ?? "/";
   const [error, setError] = useState<string>();
   const [busy, setBusy] = useState(false);
+  const [needsCode, setNeedsCode] = useState(false);
+  const go = () => router.push(next.startsWith("/") && !next.startsWith("//") ? next : "/");
+
+  async function verify(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    const code = String(new FormData(e.currentTarget).get("code") ?? "");
+    setBusy(true);
+    setError(undefined);
+    try {
+      await api("/api/auth/mfa/verify", { body: { code } });
+      go();
+    } catch (err) {
+      setError((err as Error).message);
+      setBusy(false);
+    }
+  }
 
   async function submit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -20,12 +36,32 @@ function LoginForm() {
     setBusy(true);
     setError(undefined);
     try {
-      await api("/api/auth/login", { body: { email: form.get("email"), password: form.get("password") } });
-      router.push(next.startsWith("/") && !next.startsWith("//") ? next : "/");
+      const r = await api<{ mfaRequired?: boolean }>("/api/auth/login", { body: { email: form.get("email"), password: form.get("password") } });
+      if (r.mfaRequired) {
+        setNeedsCode(true);
+        setBusy(false);
+        return;
+      }
+      go();
     } catch (err) {
       setError((err as Error).message);
       setBusy(false);
     }
+  }
+
+  if (needsCode) {
+    return (
+      <form onSubmit={verify}>
+        <div>
+          <h1>Enter your code</h1>
+          <p className="muted" style={{ margin: "6px 0 0" }}>Open your authenticator app and enter the 6-digit code for Softilo, or one of your recovery codes.</p>
+        </div>
+        <ErrorBanner message={error} />
+        <Field label="Code"><input name="code" inputMode="numeric" autoComplete="one-time-code" required autoFocus minLength={6} maxLength={12} /></Field>
+        <button className="btn primary" disabled={busy}>{busy ? "Checking…" : "Continue"}</button>
+        <button type="button" className="btn ghost" onClick={() => { setNeedsCode(false); setError(undefined); }}>Use a different account</button>
+      </form>
+    );
   }
 
   return (
